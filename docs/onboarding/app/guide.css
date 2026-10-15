@@ -444,7 +444,7 @@ select { font: inherit; font-size: 0.9rem; padding: 0.3rem; border-radius: 6px; 
 }
 
 @media (prefers-reduced-motion: reduce) {
-  * { transition: none !important; scroll-behavior: auto !important; }
+  * { transition: none !important; scroll-behavior: auto !important; animation: none !important; }
 }
 
 @media print {
@@ -525,3 +525,34 @@ main[data-guide] table.qz-plan td { vertical-align: middle; }
   padding: 0.5rem 1rem; background: var(--accent-soft); border-bottom: 1px solid var(--accent);
 }
 .qz-relay { color: var(--muted); font-style: italic; }
+
+/* Generating: the target section shows live progress until the page reloads. */
+.qz-work {
+  border: 1px solid var(--accent); border-left-width: 4px; border-radius: var(--radius);
+  background: var(--accent-soft); padding: 0.85rem 1.1rem; margin: 0.75rem 0 1.25rem;
+}
+.qz-work-stuck { border-color: var(--warn); background: var(--warn-soft); }
+.qz-work-head { display: flex; align-items: center; gap: 0.6rem; font-size: 1.05rem; }
+.qz-work p { margin: 0.6rem 0 0; }
+.qz-work-steps { list-style: none; padding: 0; margin: 0.6rem 0 0; display: grid; gap: 0.25rem; }
+.qz-work-steps li { color: var(--muted); padding-left: 1.6rem; position: relative; }
+.qz-work-steps li::before { content: "○"; position: absolute; left: 0.2rem; }
+.qz-work-steps li.qz-step-done { color: var(--text); }
+.qz-work-steps li.qz-step-done::before { content: "✓"; color: var(--ok); font-weight: 700; }
+.qz-work-steps li.qz-step-now { color: var(--text); font-weight: 600; }
+.qz-work-steps li.qz-step-now::before { content: "●"; color: var(--accent); animation: qz-pulse 1.2s ease-in-out infinite; }
+.qz-spinner {
+  width: 1.1rem; height: 1.1rem; border-radius: 50%; flex: none;
+  border: 2px solid var(--border); border-top-color: var(--accent); animation: qz-spin 0.8s linear infinite;
+}
+.qz-work-stuck .qz-spinner { border-top-color: var(--warn); }
+section.qz-generating > :not(.qz-work):not(h2):not(.qz-eyebrow) { opacity: 0.45; pointer-events: none; }
+section.qz-generating > :not(.qz-work):not(h2):not(.qz-eyebrow) { animation: qz-shimmer 1.6s ease-in-out infinite; }
+.qz-modules a.qz-writing .qz-mod-status { color: var(--accent); font-weight: 600; }
+.qz-modules a.qz-writing .qz-mod-num { border-color: var(--accent); color: var(--accent); }
+.qz-modules a.qz-writing .qz-mod-status { animation: qz-pulse 1.2s ease-in-out infinite; }
+@keyframes qz-spin { to { transform: rotate(360deg); } }
+@keyframes qz-pulse { 50% { opacity: 0.3; } }
+@keyframes qz-shimmer { 50% { opacity: 0.25; } }
+.qz-final-actions { border-top: 1px solid var(--border); margin-top: 2rem; padding-top: 0.5rem; }
+.qz-scoreboard td .qz-rating { margin: 0 0.3rem 0.3rem 0; }

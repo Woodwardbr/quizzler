@@ -384,7 +384,10 @@ class Guide:
     exercises: list[str] = field(default_factory=list)
     listings: list[Listing] = field(default_factory=list)
     plan: list[PlanRow] = field(default_factory=list)
+    refresh: list[PlanRow] = field(default_factory=list)
     overview: str | None = None
+    final: str | None = None
+    summary: str | None = None
     depths: list[tuple[str, int, str | None]] = field(default_factory=list)
     written: dict = field(default_factory=dict)
     exercise_modules: list[tuple[str, str | None]] = field(default_factory=list)
@@ -399,6 +402,19 @@ class Guide:
     @property
     def guide_id(self) -> str:
         return self.meta.get("guide-id", "")
+
+    @property
+    def round(self) -> int:
+        try:
+            return int(self.meta.get("round", "1"))
+        except ValueError:
+            return 0
+
+    @property
+    def study_modules(self) -> list[str]:
+        """Modules the plan covers: everything except overview/final/summary."""
+        special = {self.overview, self.final, self.summary}
+        return [m for m in self.modules if m not in special]
 
     @property
     def version(self) -> int:
@@ -449,6 +465,10 @@ class _GuideParser(html.parser.HTMLParser):
             frame["module"] = a["data-module"]
             if "data-overview" in a:
                 g.overview = a["data-module"]
+            if "data-final" in a:
+                g.final = a["data-module"]
+            if "data-summary" in a:
+                g.summary = a["data-module"]
             g.written[a["data-module"]] = a.get("data-written", "deep")
             g.modules.append(a["data-module"])
             g.module_titles[a["data-module"]] = a.get("data-title", a["data-module"])
@@ -474,6 +494,9 @@ class _GuideParser(html.parser.HTMLParser):
         if "data-plan" in a:
             g.plan.append(PlanRow(a["data-plan"], a.get("data-importance", ""), a.get("data-complexity", ""),
                                   a.get("data-intensity", ""), line))
+        if "data-refresh" in a:
+            g.refresh.append(PlanRow(a["data-refresh"], a.get("data-importance", ""), a.get("data-complexity", ""),
+                                     a.get("data-intensity", ""), line))
         if "data-depth" in a:
             g.depths.append((a["data-depth"], line, module))
         if "data-exercise" in a:
@@ -916,12 +939,30 @@ def results_path_for(guide_path: Path, guide_id: str, local_dir: Path = LOCAL_DI
 # ``relay.py wait`` in the background: that command exits as soon as a
 # request is pending, which wakes the session to handle it.
 
-REQUEST_ACTIONS = ("write-module", "next-module")
+# write-module: write a module to the reader's depth. next-module: review
+# mode, append the next module. final-review: write the end-of-round review.
+# new-round: start a refresher round from the review's refresh plan.
+# summary: the reader is done; write the final summary.
+REQUEST_ACTIONS = ("write-module", "next-module", "final-review", "new-round", "summary")
+LISTENER_STALE_SECONDS = 15
 
 
 def requests_path_for(guide_path: Path, guide_id: str, local_dir: Path | None = None) -> Path:
     results = results_path_for(guide_path, guide_id, local_dir or local_dir_for(guide_path))
     return results.with_name(f"{results.stem}.requests.json")
+
+
+def listener_path(requests_path: Path) -> Path:
+    """Heartbeat file touched by ``relay.py wait`` while a session listens."""
+    return requests_path.with_name(requests_path.name.replace(".requests.json", ".listener"))
+
+
+def listener_alive(requests_path: Path) -> bool:
+    beat = listener_path(requests_path)
+    try:
+        return time.time() - beat.stat().st_mtime < LISTENER_STALE_SECONDS
+    except OSError:
+        return False
 
 
 def update_requests(path: Path, change=None) -> list[dict]:

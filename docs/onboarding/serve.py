@@ -254,7 +254,8 @@ class Handler(BaseHTTPRequestHandler):
             "api/symbol": lambda: self._symbol(q),
             "api/exercise": lambda: self._exercise_info(q),
             "api/results": lambda: self._load_results(),
-            "api/requests": lambda: {"requests": gl.update_requests(app.requests_path)},
+            "api/requests": lambda: {"requests": gl.update_requests(app.requests_path),
+                                     "listening": gl.listener_alive(app.requests_path)},
             "api/changes": lambda: {"changes": app.changes(q.get("base"))},
             "api/diff": lambda: self._diff(q),
         }.get(rest)
@@ -407,7 +408,7 @@ class Handler(BaseHTTPRequestHandler):
             raise HTTPError(HTTPStatus.BAD_REQUEST, "unknown action")
         if action == "write-module" and module not in app.guide.modules:
             raise HTTPError(HTTPStatus.BAD_REQUEST, "unknown module")
-        if action == "next-module":
+        if action != "write-module":
             module = None
         wanted = data.get("wanted")
         if wanted is not None and wanted not in gl.INTENSITIES:
@@ -416,7 +417,8 @@ class Handler(BaseHTTPRequestHandler):
 
         def add(items):
             for item in items:
-                if item.get("status") == "pending" and item.get("action") == action and item.get("module") == module:
+                if item.get("status") in ("pending", "working") and item.get("action") == action \
+                        and item.get("module") == module:
                     item["wanted"] = wanted or item.get("wanted")
                     created["request"] = item
                     return
