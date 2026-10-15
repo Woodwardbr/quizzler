@@ -1,0 +1,24 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Unit, server, review and browser tests
+        run: python -m unittest discover -s tests -v
+      - name: Drift gate (anchors, symbols, exercise outputs)
+        run: python docs/onboarding/check.py
+      - name: Layout gate
+        run: python docs/onboarding/check_layout.py --require-browser

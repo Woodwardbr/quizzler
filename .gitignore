@@ -1,0 +1,6 @@
+# Personal guide state: generated guides, progress, results, review state.
+docs/onboarding/local/
+# Dedicated PR review worktrees.
+.claude/worktrees/
+__pycache__/
+*.pyc

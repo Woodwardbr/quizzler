@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quizzler onboarding</title>
+<link rel="stylesheet" href="app/guide.css">
+<script src="app/guide.js" defer></script>
+</head>
+<body>
+<main data-guide data-mode="onboard" data-guide-id="quizzler-onboard" data-version="1" data-repo="Woodwardbr/quizzler">
+  <header>
+    <h1>Quizzler onboarding</h1>
+    <p class="lede">Quizzler teaches a repository, or a pull request, in small interactive modules. This guide walks through Quizzler's own code. Each module ends with questions. Rate how confident you are in each answer, because the next version of the guide adapts to those ratings.</p>
+  </header>
+
+  <section class="module" data-module="map" data-title="One engine, two entry points">
+    <h2>One engine, two entry points</h2>
+    <p><code>/onboard</code> teaches a repository. <code>/review-pr &lt;N&gt;</code> teaches a pull request and collects your review. Both commands produce the same kind of file: a static HTML guide that loads <code data-src="docs/onboarding/app/guide.js" data-ref="Quizzler guide engine.">app/guide.js</code> and <code>app/guide.css</code>. A tiny local server, <code data-src="docs/onboarding/serve.py" data-sym="GuideApp">GuideApp</code>, serves the guide and gives the browser read-only access to source.</p>
+
+    <figure class="diagram">
+      <div class="diagram-scroll">
+      <svg viewBox="0 0 640 250" role="img" aria-labelledby="map-title map-desc">
+        <title id="map-title">Quizzler components</title>
+        <desc id="map-desc">Claude writes guides with the CLI tools. serve.py serves the guide to the browser. Results flow back to Claude through a result code or a local results file.</desc>
+        <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="arrowhead" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+        <rect class="box-accent" x="10" y="20" width="170" height="64" rx="8"/>
+        <text class="title" x="95" y="47" text-anchor="middle">Claude session</text>
+        <text class="small" x="95" y="66" text-anchor="middle">/onboard · /review-pr N</text>
+        <rect class="box" x="235" y="20" width="170" height="64" rx="8"/>
+        <text class="title" x="320" y="47" text-anchor="middle">Guide HTML</text>
+        <text class="small" x="320" y="66" text-anchor="middle">modules · anchors · questions</text>
+        <rect class="box" x="460" y="20" width="170" height="64" rx="8"/>
+        <text class="title" x="545" y="47" text-anchor="middle">serve.py</text>
+        <text class="small" x="545" y="66" text-anchor="middle">127.0.0.1 · token · policy</text>
+        <rect class="box" x="460" y="166" width="170" height="64" rx="8"/>
+        <text class="title" x="545" y="193" text-anchor="middle">Browser</text>
+        <text class="small" x="545" y="212" text-anchor="middle">guide.js · source pane</text>
+        <rect class="box-warn" x="10" y="166" width="170" height="64" rx="8"/>
+        <text class="title" x="95" y="193" text-anchor="middle">local/ (ignored)</text>
+        <text class="small" x="95" y="212" text-anchor="middle">results · progress · reviews</text>
+        <path class="edge" d="M180 52 H233" marker-end="url(#arrow)"/>
+        <path class="edge" d="M405 52 H458" marker-end="url(#arrow)"/>
+        <path class="edge" d="M545 84 V164" marker-end="url(#arrow)"/>
+        <path class="edge" d="M460 198 H182" marker-end="url(#arrow)"/>
+        <path class="edge" d="M95 166 V86" marker-end="url(#arrow)"/>
+        <text class="small" x="320" y="190" text-anchor="middle">answers saved locally</text>
+        <text class="small" x="320" y="216" text-anchor="middle">or pasted as a result code</text>
+        <text class="small" x="105" y="130">next version</text>
+      </svg>
+      </div>
+      <figcaption>The loop: Claude writes a guide, you work through it, and your answers shape the next version. Everything personal stays in <code>docs/onboarding/local/</code>, which Git ignores.</figcaption>
+    </figure>
+
+    <p>The command-line tools sit next to the server:</p>
+    <div class="table-wrap">
+    <table>
+      <thead><tr><th>Tool</th><th>Job</th></tr></thead>
+      <tbody>
+        <tr><td><code data-src="docs/onboarding/check.py" data-sym="check_guide">check.py</code></td><td>Drift gate: anchors, symbols, guide contract, exercise outputs.</td></tr>
+        <tr><td><code data-src="docs/onboarding/review.py" data-sym="prepare">review.py</code></td><td>PR worktrees, diff bases, ingesting results, SHA-bound previews.</td></tr>
+        <tr><td><code data-src="docs/onboarding/progress.py" data-sym="record_results">progress.py</code></td><td>Classifies answers, writes progress, bumps guide versions.</td></tr>
+        <tr><td><code data-src="docs/onboarding/check_layout.py" data-sym="run">check_layout.py</code></td><td>Headless browser check for broken diagrams and narrow-screen layouts.</td></tr>
+      </tbody>
+    </table>
+    </div>
+
+    <div class="question" data-q="map-state" data-answer="b">
+      <p class="prompt">You are halfway through reviewing PR 42. Where are your answers and comment drafts stored?</p>
+      <ol class="choices">
+        <li data-choice="a">In a tracked file under <code>docs/onboarding/reviews/</code> so teammates can see them.</li>
+        <li data-choice="b">In <code>docs/onboarding/local/reviews/pr-42/</code>, which Git ignores.</li>
+        <li data-choice="c">As draft review comments on GitHub.</li>
+        <li data-choice="d">Only in the browser tab, and lost on reload.</li>
+      </ol>
+      <div class="explain"><p>The server saves the results next to the review guide under <code>local/</code>. <code data-src="docs/onboarding/guidelib.py" data-sym="results_path_for">results_path_for</code> never returns a path outside <code>local/</code>, and nothing is sent to GitHub until you say so explicitly.</p></div>
+    </div>
+
+    <div class="question" data-q="map-shared" data-answer="c">
+      <p class="prompt">What do <code>/onboard</code> and <code>/review-pr</code> have in common?</p>
+      <ol class="choices">
+        <li data-choice="a">Nothing. They are separate tools that happen to live in one repository.</li>
+        <li data-choice="b">Only the stylesheet.</li>
+        <li data-choice="c">The same guide engine, the same server, and the same guide document contract. Review mode adds Changes and Review views.</li>
+      </ol>
+      <div class="explain"><p>The <code>data-mode</code> attribute on <code>&lt;main data-guide&gt;</code> switches review features on. Everything else is shared.</p></div>
+    </div>
+  </section>
+
+  <section class="module" data-module="server" data-title="The server's security boundary">
+    <h2>The server's security boundary</h2>
+    <p>The server is deliberately small and uses only the standard library. Its defences are layered:</p>
+    <ol>
+      <li><strong>Loopback only.</strong> It binds to <code data-src="docs/onboarding/serve.py" data-ref='HOST = "127.0.0.1"'>127.0.0.1</code>, and <code data-src="docs/onboarding/serve.py" data-sym="Handler._host_ok">_host_ok</code> rejects any other <code>Host</code> header, which blocks DNS-rebinding tricks.</li>
+      <li><strong>Per-run token.</strong> Each process picks <code data-src="docs/onboarding/serve.py" data-ref="self.token = token or secrets.token_urlsafe(32)">a fresh random token</code>. Every route except <code>/healthz</code> lives under <code>/t/&lt;token&gt;/</code>, and the token is compared in <code data-src="docs/onboarding/serve.py" data-ref="hmac.compare_digest(token.encode(), self.app.token.encode())">constant time</code>.</li>
+      <li><strong>Path policy.</strong> <code data-src="docs/onboarding/guidelib.py" data-sym="PathPolicy">PathPolicy</code> refuses traversal, hidden components, secret-looking names such as <code data-src="docs/onboarding/guidelib.py" data-ref='"env.storage.*", "env.storage"'>env.storage.*</code>, the guide's own <code>local/</code> state, and non-source file types. After resolving symlinks it <code data-src="docs/onboarding/guidelib.py" data-ref="if not resolved.is_relative_to(self.root):">checks the real path again</code>.</li>
+      <li><strong>Registered exercises only.</strong> The browser sends only an exercise name. Names that the active guide does not register get <code data-src="docs/onboarding/serve.py" data-ref='"exercise is not registered for this guide"'>a 404</code>. Registered exercises run in <code data-src="docs/onboarding/guidelib.py" data-sym="run_exercise">a constrained subprocess</code>.</li>
+    </ol>
+
+    <div class="exercise" data-exercise="path_policy"></div>
+
+    <div class="question" data-q="server-token" data-answer="b">
+      <p class="prompt">A page on another site tries to load <code>http://127.0.0.1:PORT/app/guide.js</code> without the token. What happens?</p>
+      <ol class="choices">
+        <li data-choice="a">The file is served, because static assets are public.</li>
+        <li data-choice="b">404. Without a valid <code>/t/&lt;token&gt;/</code> prefix, every route except <code>/healthz</code> is "not found".</li>
+        <li data-choice="c">A redirect to a login page.</li>
+      </ol>
+      <div class="explain"><p><code data-src="docs/onboarding/serve.py" data-sym="Handler._route">_route</code> returns <code>None</code> for anything outside the token prefix, and the dispatcher turns that into a 404. Even asset paths need the token.</p></div>
+    </div>
+
+    <div class="question" data-q="server-symlink" data-answer="b">
+      <p class="prompt">Someone commits <code>docs/notes.md</code> as a symlink to <code>.git/config</code>. What does the source pane show for <code>docs/notes.md</code>?</p>
+      <ol class="choices">
+        <li data-choice="a">The contents of <code>.git/config</code>, because the requested name passes every rule.</li>
+        <li data-choice="b">A refusal. The policy checks the resolved path again, and the <code>.git</code> component is hidden.</li>
+        <li data-choice="c">An empty file.</li>
+      </ol>
+      <div class="explain"><p><code data-src="docs/onboarding/guidelib.py" data-sym="PathPolicy.check">PathPolicy.check</code> resolves symlinks, confirms the result is inside the root, and then runs the component rules again on the resolved path.</p></div>
+    </div>
+
+    <div class="question" data-q="server-exercise" data-answer="c">
+      <p class="prompt">What can the browser make the server execute?</p>
+      <ol class="choices">
+        <li data-choice="a">Any Python snippet posted to <code>/api/exercise/run</code>.</li>
+        <li data-choice="b">Any file in an <code>exercises/</code> directory.</li>
+        <li data-choice="c">Only exercises that the active guide registers with <code>data-exercise</code> and that exist on disk.</li>
+      </ol>
+      <div class="explain"><p>The registry is built once, when the server starts, from the guide's <code>data-exercise</code> names. The request body carries only a name.</p></div>
+    </div>
+  </section>
+
+  <section class="module" data-module="contract" data-title="Guides that cannot silently rot">
+    <h2>Guides that cannot silently rot</h2>
+    <p>Every claim a guide makes about the code points at the source through data attributes:</p>
+    <div class="table-wrap">
+    <table>
+      <thead><tr><th>Attribute</th><th>Meaning</th><th>Checked by</th></tr></thead>
+      <tbody>
+        <tr><td><code>data-src</code> + <code>data-ref</code></td><td>Literal text that must appear exactly once in the file. Add <code>data-occurrence</code> when the text repeats.</td><td><code data-src="docs/onboarding/guidelib.py" data-sym="resolve_anchor">resolve_anchor</code></td></tr>
+        <tr><td><code>data-src</code> + <code>data-sym</code></td><td>A function, class or constant that must still exist.</td><td><code data-src="docs/onboarding/guidelib.py" data-sym="find_symbols">find_symbols</code></td></tr>
+        <tr><td><code>data-exercise</code></td><td>A registered exercise with a <code>PREDICT:</code> docstring and recorded output.</td><td><code data-src="docs/onboarding/check.py" data-sym="check_exercises">check_exercises</code></td></tr>
+        <tr><td><code>data-finding</code> + <code>data-lines</code></td><td>A proposed review finding anchored to a line range at the reviewed head SHA.</td><td><code data-src="docs/onboarding/review.py" data-sym="preview">preview</code></td></tr>
+      </tbody>
+    </table>
+    </div>
+    <p>CI runs <code>check.py</code>. If code moves and a literal no longer matches, or an exercise prints something different from <code>expected/</code>, the build fails until the guide or the recording is updated on purpose.</p>
+
+    <div class="question" data-q="contract-ambiguous" data-answer="b">
+      <p class="prompt">A guide anchors on <code>return None</code>, which appears three times in the file, and sets no <code>data-occurrence</code>. What does <code>check.py</code> do?</p>
+      <ol class="choices">
+        <li data-choice="a">It uses the first match.</li>
+        <li data-choice="b">It reports an error: the anchor is ambiguous and lists where it matched.</li>
+        <li data-choice="c">It prints a warning and passes.</li>
+      </ol>
+      <div class="explain"><p>An ambiguous anchor can quietly point at the wrong code, so it fails. Make the literal longer, or pick the occurrence explicitly.</p></div>
+    </div>
+
+    <div class="question" data-q="contract-drift" data-answer="a">
+      <p class="prompt">You change <code>PathPolicy</code> so that <code>.svg</code> files are refused. What happens in CI?</p>
+      <ol class="choices">
+        <li data-choice="a">It passes for this change, but any exercise whose printed output changes fails until <code>expected/</code> is re-recorded with <code>--update-expected</code>.</li>
+        <li data-choice="b">CI updates <code>expected/</code> by itself.</li>
+        <li data-choice="c">Nothing is checked, because exercises are only for learners.</li>
+      </ol>
+      <div class="explain"><p>The <code>path_policy</code> exercise does not print an <code>.svg</code> case, so its recording still matches. If a change alters printed output, re-recording is a deliberate, reviewable diff to <code>expected/</code>.</p></div>
+    </div>
+  </section>
+
+  <section class="module" data-module="loop" data-title="The adaptive loop and PR review">
+    <h2>The adaptive loop and PR review</h2>
+    <p>When you finish a module, your answers come back to Claude in one of two ways: the server saves them under <code>local/</code>, or you paste the <code>QUIZZLER-ONBOARD</code> result code. <code data-src="docs/onboarding/guidelib.py" data-sym="classify">classify</code> sorts each answer into one of four groups:</p>
+    <div class="table-wrap">
+    <table>
+      <thead><tr><th></th><th>Sure</th><th>Unsure or guessing</th></tr></thead>
+      <tbody>
+        <tr><th>Right</th><td>mastered: retire the question</td><td>fragile: reinforce it</td></tr>
+        <tr><th>Wrong</th><td>misconception: confront the wrong model</td><td>gap: teach it from scratch</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <p><code data-src="docs/onboarding/progress.py" data-sym="bump">progress.py bump</code> archives the current guide, increments <code>data-version</code>, and marks mastered questions with <code data-src="docs/onboarding/progress.py" data-ref='retired.setdefault(qid, f"v{version}:mastered")'>data-retired</code>. The text of the next version is written by Claude from <code>progress.py report</code>.</p>
+    <p>Review mode follows the same loop, one module of the PR at a time. Proposed findings stay locked until you have answered that module's questions, so you form your own view first. <code data-src="docs/onboarding/review.py" data-sym="preview">review.py preview</code> then binds every comment marked ready to the reviewed head SHA. <code data-src="docs/onboarding/review.py" data-ref="Posting comments is deliberately not implemented">Posting is not part of the tool</code>.</p>
+
+    <div class="exercise" data-exercise="classify_answers"></div>
+
+    <div class="question" data-q="loop-class" data-answer="b">
+      <p class="prompt">You pick the right answer but mark it "Guessing". How is that recorded?</p>
+      <ol class="choices">
+        <li data-choice="a">mastered</li>
+        <li data-choice="b">fragile</li>
+        <li data-choice="c">gap</li>
+        <li data-choice="d">misconception</li>
+      </ol>
+      <div class="explain"><p>A right answer without confidence is fragile. The question stays in the next version, usually with a varied framing.</p></div>
+    </div>
+
+    <div class="question" data-q="loop-post" data-answer="b">
+      <p class="prompt">You mark three findings "Ready" and Claude runs <code>review.py preview</code>. What has been posted to GitHub?</p>
+      <ol class="choices">
+        <li data-choice="a">The three ready findings, as one review.</li>
+        <li data-choice="b">Nothing. Posting needs a separate, explicit instruction after you have seen the exact text and targets.</li>
+        <li data-choice="c">One summary comment.</li>
+      </ol>
+      <div class="explain"><p>Finishing a review never implies permission to post. The preview gives the exact file, lines, SHA and text, so you can decide.</p></div>
+    </div>
+  </section>
+</main>
+</body>
+</html>

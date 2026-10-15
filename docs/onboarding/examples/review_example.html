@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Example review: tighten the path policy</title>
+<link rel="stylesheet" href="../app/guide.css">
+<script src="../app/guide.js" defer></script>
+</head>
+<body>
+<!-- Maintained authoring example for review mode. Real review guides are
+     generated into local/reviews/pr-N/guide.html and are never committed. -->
+<main data-guide data-mode="review" data-guide-id="example-review" data-version="1"
+      data-repo="Woodwardbr/quizzler" data-pr="0" data-head-sha="0000000000000000000000000000000000000000">
+  <header>
+    <h1>Example review: tighten the path policy</h1>
+    <p class="lede">A sample PR review guide. Each module explains one coherent part of the change, asks you questions first, and then shows proposed findings for you to agree or disagree with.</p>
+  </header>
+
+  <section class="module" data-module="policy" data-title="Request flow through the policy">
+    <h2>Request flow through the policy</h2>
+    <p>The change routes every source read through <code data-src="docs/onboarding/guidelib.py" data-sym="PathPolicy.check">PathPolicy.check</code>. It still uses <code data-src="docs/onboarding/guidelib.py" data-sym="PathPolicy.check_name">check_name</code> for paths that exist only in the base commit, such as deleted files.</p>
+    <figure class="diagram">
+      <div class="diagram-scroll">
+      <svg viewBox="0 0 640 120" role="img" aria-labelledby="flow-title">
+        <title id="flow-title">Request flow</title>
+        <defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="arrowhead" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+        <rect class="box" x="10" y="30" width="140" height="56" rx="8"/>
+        <text class="title" x="80" y="63" text-anchor="middle">/api/source</text>
+        <rect class="box-accent" x="250" y="30" width="140" height="56" rx="8"/>
+        <text class="title" x="320" y="55" text-anchor="middle">check_name</text>
+        <text class="small" x="320" y="73" text-anchor="middle">rules by name</text>
+        <rect class="box-accent" x="490" y="30" width="140" height="56" rx="8"/>
+        <text class="title" x="560" y="55" text-anchor="middle">resolve + recheck</text>
+        <text class="small" x="560" y="73" text-anchor="middle">symlinks, size</text>
+        <path class="edge" d="M150 58 H248" marker-end="url(#arr)"/>
+        <path class="edge" d="M390 58 H488" marker-end="url(#arr)"/>
+      </svg>
+      </div>
+      <figcaption>The name rules run first, then the real path is checked again after symlinks are resolved.</figcaption>
+    </figure>
+
+    <div class="question" data-q="policy-deleted" data-answer="a">
+      <p class="prompt">Why does the Changes view use <code>check_name</code> instead of <code>check</code> for a deleted file?</p>
+      <ol class="choices">
+        <li data-choice="a">The file no longer exists at the head commit, so it cannot be resolved on disk, but its name must still pass the rules.</li>
+        <li data-choice="b">Deleted files are always safe to show.</li>
+        <li data-choice="c"><code>check</code> is too slow for diffs.</li>
+      </ol>
+      <div class="explain"><p><code>check</code> resolves the path in the worktree, which is at head. A deleted file is only in the base, so it can be validated by name alone.</p></div>
+    </div>
+
+    <div class="findings">
+      <article class="finding" data-finding="policy-case" data-severity="minor" data-src="docs/onboarding/guidelib.py" data-lines="1-3">
+        <h3>Secret patterns match case-insensitively, but extensions do too</h3>
+        <p><strong>Scenario:</strong> a file named <code>NOTES.MD</code> is accepted, because the extension is lower-cased before the allowlist lookup. That is intended, but nothing tests it.</p>
+        <p><strong>Evidence:</strong> <code data-src="docs/onboarding/guidelib.py" data-sym="is_source_name">is_source_name</code> lower-cases the suffix.</p>
+        <p><strong>Impact:</strong> low. Suggest adding a regression test.</p>
+        <div class="comment-draft">Could we add a test that pins case-insensitive extension matching (e.g. `NOTES.MD`)? It's intended behaviour but currently untested.</div>
+      </article>
+    </div>
+  </section>
+
+  <section class="module" data-module="server" data-title="Server routing">
+    <h2>Server routing</h2>
+    <p>The token check happens in <code data-src="docs/onboarding/serve.py" data-sym="Handler._route">Handler._route</code>, before any route-specific code runs.</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Route</th><th>Token</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td><code>/healthz</code></td><td>no</td><td>Plain "ok", nothing else.</td></tr>
+          <tr><td><code>/t/&lt;token&gt;/api/source</code></td><td>yes</td><td>Bounded to 400 lines per request.</td></tr>
+          <tr><td><code>/t/&lt;token&gt;/api/exercise/run</code></td><td>yes</td><td>POST, JSON, registered names only.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="question" data-q="server-order" data-answer="b">
+      <p class="prompt">Which check runs first for a request?</p>
+      <ol class="choices">
+        <li data-choice="a">The token check.</li>
+        <li data-choice="b">The Host header check.</li>
+        <li data-choice="c">The path policy.</li>
+      </ol>
+      <div class="explain"><p><code data-src="docs/onboarding/serve.py" data-sym="Handler._dispatch">_dispatch</code> rejects unexpected Host headers before it looks at the path.</p></div>
+    </div>
+    <div class="findings">
+      <article class="finding" data-finding="server-head" data-severity="nit" data-src="docs/onboarding/serve.py" data-lines="1-2">
+        <h3>HEAD requests are routed like GET</h3>
+        <p><strong>Scenario:</strong> a <code>HEAD</code> to an API route computes the full response and then discards the body.</p>
+        <p><strong>Impact:</strong> negligible on loopback. Mentioned so you can disagree.</p>
+        <div class="comment-draft">Nit: HEAD runs the full GET handler. Fine for loopback; no change needed unless you prefer a 405.</div>
+      </article>
+    </div>
+  </section>
+</main>
+</body>
+</html>
