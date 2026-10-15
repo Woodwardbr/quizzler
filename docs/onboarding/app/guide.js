@@ -887,6 +887,7 @@
     }
     shell.classList.remove('qz-side-open');
     lastAuto = null;
+    code.pinnedAt = null;  // a new module always releases a pinned reference
     queueFollow();
     scheduleSave();
   }
