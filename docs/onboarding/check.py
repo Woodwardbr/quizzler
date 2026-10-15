@@ -179,14 +179,20 @@ def check_guide(guide_path: Path, repo_root: Path, report: Report, *,
         text = source(ref.path, where)
         if text is None:
             continue
+        span = None  # the anchored (start, end) lines, for data-key checks
         if ref.ref is not None:
             try:
-                gl.resolve_anchor(text, ref.ref, ref.occurrence)
+                found = gl.resolve_anchor(text, ref.ref, ref.occurrence)
+                span = (found["line"], found["end_line"])
             except gl.AnchorError as exc:
                 report.error(where, f"{ref.path}: {exc}")
         if ref.sym:
-            if gl.lookup_symbol(gl.find_symbols(ref.path, text), ref.sym) is None:
+            symbol = gl.lookup_symbol(gl.find_symbols(ref.path, text), ref.sym)
+            if symbol is None:
                 report.error(where, f"{ref.path}: symbol {ref.sym!r} not found")
+            else:
+                # Only Python symbols know where they end; elsewhere check the whole file.
+                span = (symbol["line"], symbol["end_line"]) if "end_line" in symbol else None
         if ref.lines:
             try:
                 start, end = gl.parse_line_range(ref.lines)
@@ -196,6 +202,14 @@ def check_guide(guide_path: Path, repo_root: Path, report: Report, *,
             total = len(text.split("\n")) - (1 if text.endswith("\n") else 0)
             if end > total:
                 report.error(where, f"{ref.path}: lines {ref.lines} past end of file ({total} lines)")
+            span = (start, end)
+        if ref.keys:
+            lines = text.split("\n")
+            window = "\n".join(lines[span[0] - 1:span[1]]) if span else text
+            for key in ref.keys:
+                if key not in window:
+                    report.error(where, f"{ref.path}: data-key {key!r} is not in the anchored "
+                                        + (f"lines {span[0]}-{span[1]}" if span else "file"))
 
     for finding in guide.findings:
         where = f"{name}:{finding.line}"
@@ -234,6 +248,9 @@ def check_guide(guide_path: Path, repo_root: Path, report: Report, *,
         problem = gl.listing_drift(listing.code, lines)
         if problem:
             report.error(where, f"{label}: {problem}")
+        for key in listing.keys:
+            if not any(key in line for line in listing.code):
+                report.error(where, f"{label}: data-key {key!r} is not in the listing")
 
     for exercise in guide.exercises:
         if not gl.EXERCISE_NAME_RE.match(exercise):

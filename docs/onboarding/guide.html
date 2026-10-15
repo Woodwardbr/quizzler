@@ -162,7 +162,7 @@
       <li><strong>Loopback only.</strong> It binds to <code data-src="docs/onboarding/serve.py" data-ref='HOST = "127.0.0.1"'>127.0.0.1</code>, and <code data-src="docs/onboarding/serve.py" data-sym="Handler._host_ok">_host_ok</code> rejects any other <code>Host</code> header, which blocks DNS-rebinding tricks.</li>
       <li><strong>Per-run token.</strong> Each process picks <code data-src="docs/onboarding/serve.py" data-ref="self.token = token or secrets.token_urlsafe(32)">a fresh random token</code>. Every route except <code>/healthz</code> lives under <code>/t/&lt;token&gt;/</code>, and the token is compared in <code data-src="docs/onboarding/serve.py" data-ref="hmac.compare_digest(token.encode(), self.app.token.encode())">constant time</code>.</li>
       <li><strong>Path policy.</strong> <code data-src="docs/onboarding/guidelib.py" data-sym="PathPolicy">PathPolicy</code> refuses traversal, hidden components, secret-looking names such as <code data-src="docs/onboarding/guidelib.py" data-ref='"env.storage.*", "env.storage"'>env.storage.*</code>, the guide's own <code>local/</code> state, and non-source file types. After resolving symlinks it <code data-src="docs/onboarding/guidelib.py" data-ref="if not resolved.is_relative_to(self.root):">checks the real path again</code>.</li>
-      <li><strong>Registered exercises only.</strong> The browser sends only an exercise name. Names that the active guide does not register get <code data-src="docs/onboarding/serve.py" data-ref='"exercise is not registered for this guide"'>a 404</code>. Registered exercises run in <code data-src="docs/onboarding/guidelib.py" data-sym="run_exercise">a constrained subprocess</code>.</li>
+      <li><strong>Registered exercises only.</strong> The browser sends only an exercise name. Names that the active guide does not register get <code data-src="docs/onboarding/serve.py" data-ref='"exercise is not registered for this guide"'>a 404</code>. Registered exercises run in <code data-src="docs/onboarding/guidelib.py" data-sym="run_exercise" data-key="proc.wait(timeout=timeout)|_kill(proc)" data-vars="timeout">a constrained subprocess</code>.</li>
     </ol>
 
     <div data-depth="standard">
@@ -207,7 +207,7 @@
         <li data-choice="b">A refusal. The policy checks the resolved path again, and the <code>.git</code> component is hidden.</li>
         <li data-choice="c">An empty file.</li>
       </ol>
-      <div class="explain"><p><code data-src="docs/onboarding/guidelib.py" data-sym="PathPolicy.check">PathPolicy.check</code> resolves symlinks, confirms the result is inside the root, and then runs the component rules again on the resolved path.</p></div>
+      <div class="explain"><p><code data-src="docs/onboarding/guidelib.py" data-sym="PathPolicy.check" data-key="resolved = candidate.resolve(strict=True)|if not resolved.is_relative_to(self.root):|self._check_parts(resolved.relative_to(self.root).parts, rel)">PathPolicy.check</code> resolves symlinks, confirms the result is inside the root, and then runs the component rules again on the resolved path.</p></div>
     </div>
 
     <div class="question" data-q="server-exercise" data-answer="c">

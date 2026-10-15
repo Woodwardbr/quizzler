@@ -1070,6 +1070,7 @@
           }, text || ' ')));
           listingSlot.querySelector('pre').replaceChildren(code);
           listingSlot.classList.add('qz-numbered-from');
+          colourListing(listingSlot, 'py');
         }
       }).catch((error) => { predictText.textContent = error.message; run.disabled = true; });
     }
@@ -1208,6 +1209,7 @@
     path: node.dataset.src, ref: node.dataset.ref, sym: node.dataset.sym,
     occurrence: node.dataset.occurrence, lines: node.dataset.lines,
     label: node.matches('figure') ? '' : node.textContent.trim().slice(0, 60),
+    focus: focusFor(node), keys: keysFor(node),
   });
 
   // The reference whose code is in the pane is outlined in the guide, so it
@@ -1218,6 +1220,170 @@
     activeRef = node;
     if (node) node.classList.add('qz-ref-active');
   }
+
+  // ------------------------------------------------------ syntax colours
+  // A small dependency-free tokenizer: good enough to make code readable,
+  // not a parser. Each language lists its comment and string delimiters and
+  // keywords; state carries block comments and multi-line strings across
+  // lines.
+  const KW = {
+    py: 'and as assert async await break class continue def del elif else except finally for from global if import in is lambda nonlocal not or pass raise return try while with yield match case',
+    js: 'async await break case catch class const continue debugger default delete do else export extends finally for from function get if import in instanceof let new of return set static super switch this throw try typeof var void while with yield interface type enum implements private public protected readonly declare namespace abstract as',
+    c: 'auto break case char const continue default do double else enum extern float for goto if int long register return short signed sizeof static struct switch typedef union unsigned void volatile while class public private protected new delete this throw try catch namespace using template typename virtual override final package import func go defer chan select range map struct interface type var fn let mut impl trait pub use mod match loop where self Self crate dyn move ref unsafe async await val fun object when is in out companion data sealed lateinit',
+    sh: 'if then else elif fi for while do done case esac in function return local export source exit echo set unset readonly shift',
+    rb: 'def end if elsif else unless while until for in do return class module self nil true false and or not begin rescue ensure yield then when case require attr_reader attr_accessor',
+    sql: 'select from where and or not insert into values update set delete create table index view drop alter add join left right inner outer on group by order having limit offset as distinct union all null is in like between primary key foreign references default',
+    css: '',
+  };
+  const CONST = {
+    py: 'True False None self cls __init__ __name__',
+    js: 'true false null undefined NaN Infinity this',
+    c: 'true false null nil NULL nullptr None iota',
+    sh: 'true false', rb: 'nil true false self', sql: 'true false null', css: '',
+  };
+  const DEF_WORDS = new Set(['def', 'class', 'function', 'func', 'fn', 'interface', 'struct', 'trait', 'enum', 'type', 'module', 'impl']);
+  const LANG_OF_EXT = {
+    py: 'py', pyi: 'py', js: 'js', mjs: 'js', cjs: 'js', jsx: 'js', ts: 'js', tsx: 'js', vue: 'js', svelte: 'js',
+    go: 'c', rs: 'c', java: 'c', kt: 'c', kts: 'c', scala: 'c', swift: 'c', c: 'c', h: 'c', cc: 'c', cpp: 'c', hpp: 'c', cs: 'c', php: 'c', proto: 'c', graphql: 'c', gql: 'c', gradle: 'c',
+    sh: 'sh', bash: 'sh', zsh: 'sh', yaml: 'sh', yml: 'sh', toml: 'sh', ini: 'sh', cfg: 'sh', conf: 'sh', mk: 'sh', tf: 'sh', hcl: 'sh', dockerfile: 'sh', r: 'sh', ex: 'sh', exs: 'sh',
+    rb: 'rb', sql: 'sql', css: 'css', scss: 'css', less: 'css', json: 'json', lock: 'json', html: 'html', htm: 'html', xml: 'html', svg: 'html',
+  };
+  const SYNTAX = {
+    py: { line: ['#'], block: null, strings: ['"""', "'''", '"', "'"] },
+    js: { line: ['//'], block: ['/*', '*/'], strings: ['`', '"', "'"] },
+    c: { line: ['//'], block: ['/*', '*/'], strings: ['"', "'", '`'] },
+    sh: { line: ['#'], block: null, strings: ['"', "'"] },
+    rb: { line: ['#'], block: null, strings: ['"', "'"] },
+    sql: { line: ['--'], block: ['/*', '*/'], strings: ["'", '"'] },
+    css: { line: [], block: ['/*', '*/'], strings: ['"', "'"] },
+    json: { line: [], block: null, strings: ['"'] },
+    html: { line: [], block: ['<!--', '-->'], strings: ['"', "'"] },
+  };
+  const wordSets = {};
+  const words = (table, lang) => {
+    const key = `${lang}:${table === KW ? 'kw' : 'c'}`;
+    return (wordSets[key] ||= new Set((table[lang] || '').split(/\s+/).filter(Boolean)));
+  };
+
+  function langOf(path) {
+    const name = (path || '').split('/').pop().toLowerCase();
+    if (name === 'makefile' || name === 'dockerfile' || name === 'justfile') return 'sh';
+    return LANG_OF_EXT[name.includes('.') ? name.split('.').pop() : ''] || null;
+  }
+
+  // Returns a tokenizer: call it once per line, in order; it remembers open
+  // block comments and multi-line strings. Tokens are [className, text];
+  // identifiers have a class starting with 'id' so callers can decorate them.
+  function tokenizer(lang) {
+    const syn = SYNTAX[lang];
+    let open = null;  // { cls, end } carried across lines
+    return (line) => {
+      const out = [];
+      const push = (cls, text) => { if (text) out.push([cls, text]); };
+      if (!syn) { push('', line); return out; }
+      let i = 0;
+      let prevWord = '';
+      while (i < line.length) {
+        if (open) {
+          const end = line.indexOf(open.end, i);
+          if (end === -1) { push(open.cls, line.slice(i)); return out; }
+          push(open.cls, line.slice(i, end + open.end.length));
+          i = end + open.end.length;
+          open = null;
+          continue;
+        }
+        const rest = line.slice(i);
+        if (syn.line.some((m) => rest.startsWith(m))) { push('tk-com', rest); break; }
+        if (syn.block && rest.startsWith(syn.block[0])) {
+          open = { cls: 'tk-com', end: syn.block[1] };
+          push('tk-com', syn.block[0]);
+          i += syn.block[0].length;
+          continue;
+        }
+        const q = syn.strings.find((d) => rest.startsWith(d));
+        if (q) {
+          let j = i + q.length;
+          while (j < line.length) {
+            if (line[j] === '\\') { j += 2; continue; }
+            if (line.startsWith(q, j)) break;
+            j += 1;
+          }
+          if (j >= line.length) {
+            push('tk-str', rest);
+            if (q.length === 3 || q === '`') open = { cls: 'tk-str', end: q };
+            break;
+          }
+          push('tk-str', line.slice(i, j + q.length));
+          i = j + q.length;
+          prevWord = '';
+          continue;
+        }
+        if (lang === 'py' && /^@[\w.]+/.test(rest)) {
+          const m = /^@[\w.]+/.exec(rest)[0];
+          push('tk-dec', m); i += m.length; continue;
+        }
+        const num = /^(?:0[xXbBoO][\da-fA-F_]+|\d[\d_]*(?:\.\d[\d_]*)?(?:[eE][+-]?\d+)?)[jJlLuUfF]?/.exec(rest);
+        if (num && !/[\w$]/.test(line[i - 1] || '')) { push('tk-num', num[0]); i += num[0].length; continue; }
+        const word = /^[A-Za-z_$][\w$]*/.exec(rest);
+        if (word) {
+          const w = word[0];
+          const after = /^\s*(\S)/.exec(line.slice(i + w.length));
+          let cls = 'id';
+          if (lang === 'json') cls = /^(true|false|null)$/.test(w) ? 'tk-const' : 'id';
+          else if (words(KW, lang).has(lang === 'sql' ? w.toLowerCase() : w)) cls = 'tk-kw';
+          else if (words(CONST, lang).has(w)) cls = 'tk-const';
+          else if (DEF_WORDS.has(prevWord)) cls = 'id tk-def';
+          else if (after && after[1] === '(') cls = 'id tk-call';
+          else if (/^[A-Z][A-Za-z0-9]*[a-z]/.test(w) && lang !== 'sql') cls = 'id tk-type';
+          push(cls, w);
+          prevWord = w;
+          i += w.length;
+          continue;
+        }
+        const ws = /^\s+/.exec(rest);
+        if (ws) { push('', ws[0]); i += ws[0].length; continue; }
+        push('tk-op', line[i]);
+        i += 1;
+      }
+      return out;
+    };
+  }
+
+  // Render one line's tokens; identifiers in `focus` get the focus marker.
+  function renderTokens(tokens, focus) {
+    return tokens.map(([cls, text]) => {
+      const isId = cls.startsWith('id');
+      const classes = cls.split(' ').filter((c) => c && c !== 'id');
+      if (isId && focus && focus.has(text)) classes.push('tk-focus');
+      if (!classes.length) return document.createTextNode(text);
+      return el('span', { class: classes.join(' '), 'data-tok': isId ? text : null }, text);
+    });
+  }
+
+  // ------------------------------------------------------- concept focus
+  // Which identifiers matter for the reference being shown: inline <code>
+  // in the same sentence or bullet, the symbol's own name, and any explicit
+  // data-vars. Authors can also name key lines with data-key="lit|lit".
+  const FOCUS_STOP = new Set(['self', 'cls', 'this', 'None', 'True', 'False', 'null', 'true', 'false', 'return', 'def', 'class', 'import', 'from', 'if', 'else', 'for', 'in', 'and', 'or', 'not']);
+
+  function focusFor(node) {
+    const names = new Set();
+    const add = (text) => {
+      text = (text || '').trim();
+      const m = /^@?([A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*)/.exec(text);
+      if (!m || text.includes('/')) return;
+      const last = m[1].split('.').pop();
+      if (last.length >= 2 && !FOCUS_STOP.has(last)) names.add(last);
+    };
+    if (node.dataset.sym) add(node.dataset.sym);
+    (node.dataset.vars || '').split(/[\s,]+/).forEach(add);
+    const block = node.closest('li, p, td, dd, .explain, figcaption, .note, .warning');
+    if (block) block.querySelectorAll('code').forEach((c) => { if (!c.closest('figure')) add(c.textContent); });
+    if (node.tagName === 'CODE' && !node.dataset.ref) add(node.textContent);
+    return names;
+  }
+
+  const keysFor = (node) => (node.dataset.key || '').split('|').map((k) => k.trim()).filter(Boolean);
 
   // --------------------------------------------------------- code listings
   // A listing is <figure class="code-listing"> with a <pre>. Lines become
@@ -1237,6 +1403,7 @@
       figure.classList.add('qz-numbered-from');
       pre.querySelectorAll('.l').forEach((line, i) => { line.dataset.n = Number(range[1]) + i; });
     }
+    colourListing(figure, langOf(figure.dataset.src || figure.querySelector('figcaption span')?.textContent || ''));
     let caption = figure.querySelector('figcaption');
     if (!caption) {
       caption = el('figcaption', {}, el('span', { text: figure.dataset.src || 'Code' }));
@@ -1249,6 +1416,17 @@
         onclick: (event) => { markActive(figure); openSource(targetOf(figure), event.currentTarget); },
       }, 'Show in file ↗'));
     }
+  }
+
+  function colourListing(figure, lang) {
+    const next = tokenizer(lang);
+    const keys = keysFor(figure);
+    figure.querySelectorAll('.l').forEach((line) => {
+      const text = line.textContent === ' ' ? '' : line.textContent;
+      const nodes = renderTokens(next(text), null);
+      if (nodes.length) line.replaceChildren(...nodes); else line.textContent = ' ';
+      if (keys.some((k) => text.includes(k))) line.classList.add('qz-key');
+    });
   }
 
   function buildListings() {
@@ -1280,7 +1458,7 @@
       el('div', { class: 'qz-code-head' }, codeTitle,
         el('div', { class: 'qz-row qz-code-head-actions' }, mapBack,
           el('button', { class: 'qz-btn', type: 'button', 'aria-label': 'Close source', onclick: closeSource }, 'Close'))),
-      codeInfo, commentBox, codeBody);
+      codeInfo, focusStrip, commentBox, codeBody);
     codePane.addEventListener('keydown', (event) => { if (event.key === 'Escape') closeSource(); });
   }
 
@@ -1296,6 +1474,8 @@
       code.returnFocus = trigger || document.activeElement;
       autoFollow = true;
       code.userOpened = true;
+      // What the reader clicked stays put until they scroll on a fair way.
+      code.pinnedAt = window.scrollY;
       // On the overview the pane belongs to the repo map; a file opened from
       // there keeps a way back instead of being replaced by auto-follow.
       if (overview && modules[state.current] === overview) {
@@ -1334,6 +1514,8 @@
       if (seq !== openSeq) return;
       code.highlight = target.ref || target.sym || target.lines ? [line, end] : null;
       code.label = target.label || target.sym || '';
+      code.focus = target.focus || new Set();
+      code.keys = target.keys || [];
       await loadSource(target.path, { around: line });
       if (seq !== openSeq) return;
       const row = codeBody.querySelector(`[data-line="${line}"]`);
@@ -1368,17 +1550,34 @@
     }
     codeInfo.textContent = parts.join(' · ');
     const list = el('ol', { class: 'qz-lines', start: String(data.start) });
+    const next = tokenizer(langOf(data.path));
+    const focus = code.highlight ? (code.focus || new Set()) : new Set();
+    const keys = code.highlight ? (code.keys || []) : [];
+    const inRange = (n) => Boolean(code.highlight) && n >= code.highlight[0] && n <= code.highlight[1];
+    const seen = new Set();
     data.lines.forEach((text, i) => {
       const n = data.start + i;
       const classes = ['qz-line'];
-      if (code.highlight && n >= code.highlight[0] && n <= code.highlight[1]) classes.push('qz-hl');
+      const tokens = next(text);
+      if (inRange(n)) {
+        classes.push('qz-hl');
+        if (n === code.highlight[0]) classes.push('qz-hl-first');
+        if (n === code.highlight[1]) classes.push('qz-hl-last');
+        const usesFocus = tokens.some(([cls, t]) => cls.startsWith('id') && focus.has(t));
+        if (keys.some((k) => text.includes(k))) classes.push('qz-key');
+        else if (!keys.length && usesFocus && code.highlight[1] > code.highlight[0]) classes.push('qz-key-soft');
+        tokens.forEach(([cls, t]) => { if (cls.startsWith('id') && focus.has(t)) seen.add(t); });
+      }
       if (code.changed.has(n)) classes.push('qz-added');
       const number = el('button', {
         class: 'qz-ln', type: 'button', 'aria-label': `Line ${n}${isReview ? ', select for a comment' : ''}`,
         onclick: (event) => selectLine(n, event.shiftKey),
       }, String(n));
-      list.append(el('li', { class: classes.join(' '), 'data-line': n }, number, el('code', { text: text || ' ' })));
+      const body = el('code', {}, renderTokens(tokens, inRange(n) ? focus : null));
+      if (!text) body.textContent = ' ';
+      list.append(el('li', { class: classes.join(' '), 'data-line': n }, number, body));
     });
+    renderFocusStrip([...focus].filter((f) => seen.has(f)), list);
     const controls = [];
     if (data.start > 1) {
       controls.push(el('button', { class: 'qz-btn', type: 'button', onclick: () => loadSource(path, { start: Math.max(1, data.start - 400), end: data.start - 1 }) }, 'Show earlier lines'));
@@ -1387,6 +1586,28 @@
       controls.push(el('button', { class: 'qz-btn', type: 'button', onclick: () => loadSource(path, { start: data.end + 1 }) }, 'Show later lines'));
     }
     codeBody.replaceChildren(list, el('div', { class: 'qz-row' }, controls));
+  }
+  // "Look for" chips: the concept's identifiers found in the shown range.
+  // Clicking a chip steps through its occurrences.
+  const focusStrip = el('div', { class: 'qz-focus-strip', hidden: true });
+  function renderFocusStrip(names, list) {
+    focusStrip.hidden = !names.length;
+    if (!names.length) { focusStrip.replaceChildren(); return; }
+    const cursor = {};
+    focusStrip.replaceChildren(el('span', { class: 'qz-focus-label', text: 'Look for:' }),
+      ...names.map((name) => el('button', {
+        class: 'qz-focus-chip', type: 'button', title: `Jump to the next “${name}”`,
+        onclick: () => {
+          const hits = [...list.querySelectorAll('.tk-focus')].filter((n) => n.dataset.tok === name);
+          if (!hits.length) return;
+          cursor[name] = ((cursor[name] ?? -1) + 1) % hits.length;
+          const hit = hits[cursor[name]];
+          list.querySelectorAll('.tk-flash').forEach((n) => n.classList.remove('tk-flash'));
+          hit.classList.add('tk-flash');
+          const top = hit.getBoundingClientRect().top - codeBody.getBoundingClientRect().top + codeBody.scrollTop;
+          codeBody.scrollTop = Math.max(0, top - codeBody.clientHeight / 3);
+        },
+      }, name)));
   }
 
   function selectLine(n, extend) {
@@ -1442,6 +1663,10 @@
       return;
     }
     if (code.mode === 'map' || code.mode === 'map-source') { code.mode = null; lastAuto = null; }
+    if (code.pinnedAt != null) {
+      if (Math.abs(window.scrollY - code.pinnedAt) < window.innerHeight * 0.35) return;
+      code.pinnedAt = null;
+    }
     const refs = [...section.querySelectorAll('.qz-ref[data-src], .qz-ref-listing')].filter((n) => n.offsetParent !== null);
     if (!refs.length) return;
     const line = window.innerHeight * 0.4;
@@ -1526,6 +1751,7 @@
     backdrop.hidden = wide();
     commentBox.hidden = true;
     codeTitle.textContent = 'Repository map';
+    focusStrip.hidden = true;
     codeTitle.classList.add('qz-title-plain');
     codeInfo.textContent = 'Folders and what lives in them. Click a folder to expand it, or a file to open it.';
     await outlineReady;
