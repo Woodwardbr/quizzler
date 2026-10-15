@@ -64,6 +64,8 @@ def record_results(directory: Path, payload: dict, guide: gl.Guide | None) -> di
         "answers": graded, "exercises": exercises, "findings": findings,
         "comments": len(payload.get("comments") or []),
         "plan": {str(k): v for k, v in (payload.get("plan") or {}).items() if v in gl.INTENSITIES},
+        "refresh": {str(k): v for k, v in (payload.get("refresh") or {}).items() if v in gl.INTENSITIES},
+        "round": int(payload.get("round") or (guide.round if guide else 1) or 1),
     }
     progress_path = directory / "progress.json"
     progress = _load(progress_path)
@@ -192,6 +194,22 @@ def report(directory: Path, guide: gl.Guide | None) -> str:
                 out.append(f"      reasoning: {rec['reasoning'][:300]}")
             out.append(f"      next: {action}")
         out.append("")
+    refresh = entry.get("refresh") or {}
+    if refresh:
+        out.append("Refresh plan for the next round (the reader's choice per module):")
+        out += [f"  - {m}: {i}" for m, i in refresh.items()]
+        out.append("")
+    rounds = sorted({h.get("round", 1) for h in progress["history"]})
+    if len(rounds) > 1 or rounds[0] > 1:
+        out.append("Across rounds (latest classification per round; use it for the final review and summary):")
+        by_q: dict[str, dict[int, str]] = {}
+        for h in progress["history"]:
+            for qid, rec in h["answers"].items():
+                by_q.setdefault(f"{rec.get('module') or '?'}/{qid}", {})[h.get("round", 1)] = rec["classification"]
+        for key, per_round in sorted(by_q.items()):
+            trail = " -> ".join(f"r{r}:{c}" for r, c in sorted(per_round.items()))
+            out.append(f"  - {key}: {trail}")
+        out.append("")
     missed = [n for n, r in entry["exercises"].items() if r["ran"] and not r["matched"]]
     unrun = [n for n, r in entry["exercises"].items() if not r["ran"]]
     if missed:
@@ -208,8 +226,12 @@ def report(directory: Path, guide: gl.Guide | None) -> str:
     return "\n".join(out)
 
 
-def bump(guide_path: Path, directory: Path, local_dir: Path = gl.LOCAL_DIR) -> dict:
-    """Archive the current guide, increment data-version, mark retired questions."""
+def bump(guide_path: Path, directory: Path, local_dir: Path = gl.LOCAL_DIR, new_round: bool = False) -> dict:
+    """Archive the current guide, increment data-version, mark retired questions.
+
+    With ``new_round`` the guide also moves to the next round (data-round);
+    the finished round is archived as ``<guide>.round<N>.html`` for reference.
+    """
     text = gl.read_text(guide_path)
     guide = gl.parse_guide(text)
     progress = _load(directory / "progress.json")
@@ -220,11 +242,20 @@ def bump(guide_path: Path, directory: Path, local_dir: Path = gl.LOCAL_DIR) -> d
         archive = local_dir / "versions" / f"{guide.guide_id}.v{version}.html"
     archive.parent.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(guide_path, archive)
+    round_archive = None
+    if new_round:
+        round_archive = archive.with_name(f"{guide_path.stem if archive.parent == guide_path.parent else guide.guide_id}.round{guide.round}.html")
+        shutil.copyfile(guide_path, round_archive)
 
     main_tag = re.search(r"<main\b[^>]*\bdata-guide\b[^>]*>", text)
     if not main_tag:
         raise SystemExit("guide has no <main data-guide> element")
     tag = main_tag.group(0)
+    if new_round:
+        if re.search(r'\bdata-round="\d+"', tag):
+            tag = re.sub(r'\bdata-round="\d+"', f'data-round="{guide.round + 1}"', tag)
+        else:
+            tag = tag[:-1] + f' data-round="{guide.round + 1}">'
     if re.search(r'\bdata-version="\d+"', tag):
         new_tag = re.sub(r'\bdata-version="\d+"', f'data-version="{version + 1}"', tag)
     else:
@@ -243,7 +274,10 @@ def bump(guide_path: Path, directory: Path, local_dir: Path = gl.LOCAL_DIR) -> d
         text = text[:match.start()] + start_tag + text[match.end():]
         retired_now.append(qid)
     guide_path.write_text(text, encoding="utf-8")
-    return {"archived": str(archive), "version": version + 1, "retired": retired_now}
+    result = {"archived": str(archive), "version": version + 1, "retired": retired_now}
+    if new_round:
+        result.update(round=guide.round + 1, round_archive=str(round_archive))
+    return result
 
 
 def main(argv=None) -> int:
@@ -254,7 +288,8 @@ def main(argv=None) -> int:
     i.add_argument("code", nargs="?", default=None,
                    help="result code, or - for stdin (default: the server's autosaved results file)")
     sub.add_parser("report")
-    sub.add_parser("bump")
+    b = sub.add_parser("bump")
+    b.add_argument("--new-round", action="store_true", help="also start the next round (data-round + 1)")
     args = parser.parse_args(argv)
 
     guide_path = (args.guide or default_guide()).resolve()
@@ -283,7 +318,7 @@ def main(argv=None) -> int:
     elif args.command == "report":
         print(report(directory, guide))
     elif args.command == "bump":
-        print(json.dumps(bump(guide_path, directory, local_dir), indent=2))
+        print(json.dumps(bump(guide_path, directory, local_dir, new_round=args.new_round), indent=2))
     return 0
 
 

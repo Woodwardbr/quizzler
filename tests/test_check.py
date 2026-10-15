@@ -149,6 +149,26 @@ class DriftGateTest(unittest.TestCase):
         self.assertIn("only written to 'skim'; raise data-written", errors["d.html"])
         self.assertIn("data-written must be one of", errors["w.html"])
 
+    def test_final_and_summary_rules(self):
+        from support import OVERVIEW
+        final = ('<section class="module" data-module="final-review" data-final><h2>F</h2><table><tbody>'
+                 '<tr data-refresh="m1" data-intensity="deep"><td>1</td></tr>'
+                 '<tr data-refresh="ghost" data-intensity="hard"><td>g</td></tr></tbody></table></section>')
+        m1 = '<section class="module" data-module="m1"><h2>1</h2></section>'
+        summary = '<section class="module" data-module="summary" data-summary><h2>S</h2></section>'
+        self.fx.write_guide("ok.html", OVERVIEW + m1 + final.replace(
+            '<tr data-refresh="ghost" data-intensity="hard"><td>g</td></tr>', "") + summary, extra=' data-round="2"')
+        self.fx.write_guide("bad.html", OVERVIEW + final + m1)
+        errors = {}
+        for guide in ("ok.html", "bad.html"):
+            report = check.Report()
+            check.check_guide(self.fx.onboard / guide, self.fx.root, report, onboard_dir=self.fx.onboard)
+            errors[guide] = "\n".join(report.errors)
+        self.assertEqual(errors["ok.html"], "")
+        for expected in ("final review section must be the last module", "data-refresh='ghost' is not a study module",
+                         "data-intensity must be one of"):
+            self.assertIn(expected, errors["bad.html"])
+
     def test_review_guide_needs_sha(self):
         self.fx.write_guide("r.html", DEFAULT_BODY, mode="review")
         report = check.Report()

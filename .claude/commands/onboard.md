@@ -46,6 +46,41 @@ The page asks you for work through a queue. When the reader opens a module that 
 
 If the page reports that nobody answered, the user will run the command again and say "continue"; pick up from `relay.py list`.
 
+## End of a round: final review, new round, summary
+
+The last entry in an onboarding guide is the final review. Until you write one, the engine shows a live scoreboard there and a **Generate my final review** button. Handle the three requests it leads to as follows.
+
+### `final-review`
+
+1. Run `progress.py ingest`, then `progress.py report`. The report includes an "Across rounds" history from round 2 onwards.
+2. Append (or replace) the last section: `<section class="module" data-module="final-review" data-final data-title="Final review">`. It has no questions or exercises, and contains:
+   - **Key points:** an honest one-paragraph verdict for this round.
+   - **What you've got:** bullets per module, naming the concepts behind mastered answers, with anchors to the code.
+   - **What you missed:** bullets per module for misconceptions first, then gaps, then fragile answers, then unanswered questions and missed exercise predictions. Say what the right model is in one line, and anchor it.
+   - **From round 2 on:** what improved and what is still shaky, using the "Across rounds" history.
+   - **A refresh plan table:** header `<th>Module</th><th>Why revisit</th>`, with one `<tr data-refresh="<module>" data-intensity="skip|skim|standard|deep">` row per study module. Recommend `skip` for mastered modules and `deep` for modules with misconceptions. The engine adds the dropdowns and the "Start round N+1" and "I'm done" buttons.
+3. Validate the guide, then run `relay.py done`.
+
+### `new-round`
+
+1. Run `progress.py ingest`. The reader's refresh choices are in the report's "Refresh plan". Then run `progress.py bump --new-round`, which archives the round and sets `data-round`.
+2. Rebuild the guide as a refresher. It doesn't need to keep the old layout, but keep the module ids so the history lines up:
+   - **New overview:** what this round focuses on, and a round-history table (module, then the round 1 result, round 2 result, …). The study plan table uses the reader's refresh choices as each row's `data-intensity`, so they become the new recommendations.
+   - **Modules:** skeletons again (`data-written="skeleton"`), written on demand like round 1. Aim them at what was missed. Use new examples and new questions with new ids for re-tested ideas, since mastered questions stay retired. Don't repeat explanations that already worked.
+   - **No final review section:** remove the old one, and the engine shows the scoreboard and button again.
+3. Validate the guide, then run `relay.py done`.
+
+### `summary`
+
+1. Run `progress.py ingest` and `progress.py report`.
+2. Append `<section class="module" data-module="summary" data-summary data-title="What you learned">` after the final review. Include:
+   - A short narrative of the journey across rounds.
+   - A table per module: final standing and the key concepts, with anchors.
+   - "You can now…" bullets of concrete things the reader can do in this repo.
+   - What remains shaky, as pointers for later.
+3. Write the same summary as Markdown to `docs/onboarding/local/summary.md`.
+4. Validate the guide, run `relay.py done`, and tell the user where the summary is. Stop listening unless they ask for more.
+
 ## Continuing a guide
 
 Continue when the arguments contain a `QUIZZLER-ONBOARD {...}` result code, when the user says "continue" (or similar), or when they come back after changing the plan.

@@ -96,19 +96,34 @@ def check_guide(guide_path: Path, repo_root: Path, report: Report, *,
         planned = [row.module for row in guide.plan]
         for row in guide.plan:
             where = f"{name}:{row.line}"
-            if row.module not in guide.modules or row.module == guide.overview:
+            if row.module not in guide.study_modules:
                 report.error(where, f"plan row data-plan={row.module!r} is not a later module")
             for attr, value in (("importance", row.importance), ("complexity", row.complexity)):
                 if value not in gl.RATINGS:
                     report.error(where, f"plan row {row.module}: data-{attr} must be one of {gl.RATINGS}")
             if row.intensity not in gl.INTENSITIES:
                 report.error(where, f"plan row {row.module}: data-intensity must be one of {gl.INTENSITIES}")
-        missing = [m for m in guide.modules if m != guide.overview and m not in planned]
+        missing = [m for m in guide.study_modules if m not in planned]
         if missing:
             report.error(name, f"overview plan has no row for: {', '.join(missing)}")
         dupes = sorted({m for m in planned if planned.count(m) > 1})
         if dupes:
             report.error(name, f"overview plan lists modules twice: {', '.join(dupes)}")
+    for label, section in (("final review", guide.final), ("summary", guide.summary)):
+        if section is None:
+            continue
+        if guide.modules and guide.modules[-1] != section and not (label == "final review" and guide.summary):
+            report.error(name, f"the {label} section must be the last module")
+        if any(q.module == section for q in guide.questions):
+            report.error(name, f"the {label} section must not contain questions")
+    for row in guide.refresh:
+        where = f"{name}:{row.line}"
+        if row.module not in guide.study_modules:
+            report.error(where, f"refresh row data-refresh={row.module!r} is not a study module")
+        if row.intensity not in gl.INTENSITIES:
+            report.error(where, f"refresh row {row.module}: data-intensity must be one of {gl.INTENSITIES}")
+    if guide.meta.get("round") is not None and guide.round < 1:
+        report.error(name, "data-round must be a positive integer")
     for depth, line, module in guide.depths:
         if depth not in gl.DEPTHS:
             report.error(f"{name}:{line}", f"data-depth must be one of {gl.DEPTHS}")
@@ -116,7 +131,7 @@ def check_guide(guide_path: Path, repo_root: Path, report: Report, *,
             report.error(f"{name}:{line}", f"data-depth={depth!r} content in module {module!r}, "
                                            f"which is only written to {guide.written[module]!r}; raise data-written")
     for module, written in guide.written.items():
-        if module == guide.overview:
+        if module in (guide.overview, guide.final, guide.summary):
             continue
         if written not in gl.WRITTEN_LEVELS:
             report.error(name, f"module {module}: data-written must be one of {gl.WRITTEN_LEVELS}")

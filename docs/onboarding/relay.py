@@ -38,12 +38,40 @@ def pending(path: Path) -> list[dict]:
     return [r for r in gl.update_requests(path) if r.get("status") == "pending"]
 
 
+def claim(path: Path) -> list[dict]:
+    """Move pending requests to "working" (the page shows Claude picked them up)."""
+    claimed: list[dict] = []
+
+    def change(items):
+        for item in items:
+            if item.get("status") == "pending":
+                item["status"] = "working"
+                claimed.append(dict(item))
+
+    gl.update_requests(path, change)
+    return claimed
+
+
+def heartbeat(path: Path) -> None:
+    beat = gl.listener_path(path)
+    beat.parent.mkdir(parents=True, exist_ok=True)
+    beat.touch()
+
+
 def wait(path: Path, timeout: float | None, interval: float = 1.0) -> list[dict]:
+    """Block until requests are pending, then claim and return them.
+
+    Requests left "working" by a session that died are handed out again.
+    """
     deadline = None if timeout is None else time.monotonic() + timeout
+    stale = [r for r in gl.update_requests(path) if r.get("status") == "working"]
+    if stale:
+        heartbeat(path)
+        return stale
     while True:
-        found = pending(path)
-        if found:
-            return found
+        heartbeat(path)
+        if pending(path):
+            return claim(path)
         if deadline is not None and time.monotonic() >= deadline:
             return []
         time.sleep(interval)
@@ -54,7 +82,7 @@ def mark_done(path: Path, ids: list[str] | None) -> list[str]:
 
     def change(items):
         for item in items:
-            if item.get("status") == "pending" and (ids is None or item.get("id") in ids):
+            if item.get("status") in ("pending", "working") and (ids is None or item.get("id") in ids):
                 item["status"] = "done"
                 marked.append(item["id"])
 
@@ -66,7 +94,12 @@ def describe(item: dict) -> str:
     if item["action"] == "write-module":
         depth = f" at {item['wanted']} depth" if item.get("wanted") else ""
         return f"{item['id']}: write module {item['module']!r}{depth}"
-    return f"{item['id']}: write the next module"
+    return f"{item['id']}: " + {
+        "next-module": "write the next module",
+        "final-review": "write the final review for this round",
+        "new-round": "start a refresher round from the reader's refresh plan",
+        "summary": "the reader is done: write the final summary",
+    }.get(item["action"], item["action"])
 
 
 def main(argv=None) -> int:

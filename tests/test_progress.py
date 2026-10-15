@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 import unittest
 
 from support import Fixture
@@ -91,6 +92,20 @@ class AdaptiveLoopTest(unittest.TestCase):
         text = progress.report(guide_path.parent, guide)
         self.assertIn("m1: written skim, reader wants deep", text)
         self.assertNotIn("m3: written", text)
+
+    def test_new_round_and_history(self):
+        guide = gl.load_guide(self.guide_path)
+        directory = self.guide_path.parent
+        progress.record_results(directory, dict(self.payload, round=1, refresh={"m1": "deep"}), guide)
+        result = progress.bump(self.guide_path, directory, self.local, new_round=True)
+        self.assertEqual(result["round"], 2)
+        self.assertTrue(Path(result["round_archive"]).is_file())
+        bumped = gl.load_guide(self.guide_path)
+        self.assertEqual((bumped.round, bumped.version), (2, 2))
+        second = dict(self.payload, version=2, round=2, answers={"q2": {"choice": "a", "confidence": "sure"}})
+        progress.record_results(directory, second, bumped)
+        text = progress.report(directory, bumped)
+        self.assertIn("m1/q2: r1:misconception -> r2:mastered", text)
 
     def test_cli_rejects_wrong_guide(self):
         code = "QUIZZLER-ONBOARD " + json.dumps(dict(self.payload, guide="someone-else"))

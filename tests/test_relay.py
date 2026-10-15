@@ -55,6 +55,25 @@ class RelayTest(unittest.TestCase):
         self.assertEqual(relay.mark_done(path, [found[0]["id"]]), [found[0]["id"]])
         self.assertEqual(relay.pending(path), [])
 
+    def test_claim_and_listener_status(self):
+        def queue():
+            conn = http.client.HTTPConnection("127.0.0.1", self.app.port, timeout=10)
+            conn.request("GET", f"/t/{self.app.token}/api/requests")
+            data = json.loads(conn.getresponse().read())
+            conn.close()
+            return data
+        self.assertFalse(queue()["listening"])
+        self.post({"action": "final-review"})
+        found = relay.wait(self.app.requests_path, timeout=2, interval=0.05)
+        self.assertEqual([(r["action"], r["status"]) for r in found], [("final-review", "working")])
+        self.assertTrue(queue()["listening"])
+        self.assertEqual(queue()["requests"][0]["status"], "working")
+        # A session that died mid-request: the next wait hands the work out again.
+        again = relay.wait(self.app.requests_path, timeout=0.2, interval=0.05)
+        self.assertEqual([r["id"] for r in again], [found[0]["id"]])
+        relay.mark_done(self.app.requests_path, [found[0]["id"]])
+        self.assertEqual(relay.wait(self.app.requests_path, timeout=0.2, interval=0.05), [])
+
     def test_server_picks_up_rewritten_guide(self):
         before = self.app.meta()["guide_mtime"]
         self.assertNotIn("extra", self.app.exercises)
