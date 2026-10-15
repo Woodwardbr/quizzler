@@ -161,6 +161,7 @@ Continue when the arguments contain a `QUIZZLER-ONBOARD {...}` result code, when
      - Give each row `data-area="<path>"`, using a trailing `/` for folders, for example `<tr data-area="src/api/">`.
      - The row's text becomes that folder's description in the **repository map**, which the code pane shows while the reader is on the overview.
      - Cover every top-level folder that matters, plus the important subfolders. Hidden folders don't appear in the map.
+     - The map shows module chips where each module's anchors point, and on the final review it shows understanding scores by location. If a module is about a folder it anchors only lightly, add `data-paths="dir/"` to its `<section>`.
    - The study plan table. Its header row is `<th>Module</th><th>What you will learn</th>`, and it has one row per later module: `<tr data-plan="<module id>" data-importance="…" data-complexity="…" data-intensity="…"><td>Title</td><td>One line</td></tr>`. The engine adds the rating badges and a dropdown the reader uses to change the intensity or skip the module.
    - A short list explaining the four intensities. Make it the last thing in the overview; the engine puts a large **Generate modules** button after it.
    - Don't describe how or when modules get written (no "say continue", "written on demand" or "start the first module" text). The button says it all, and unwritten modules simply stay outlines.

@@ -888,6 +888,7 @@
     shell.classList.remove('qz-side-open');
     lastAuto = null;
     code.pinnedAt = null;  // a new module always releases a pinned reference
+    if (code.mode === 'map-source') code.mode = null;
     queueFollow();
     scheduleSave();
   }
@@ -1479,7 +1480,7 @@
       code.pinnedAt = window.scrollY;
       // On the overview the pane belongs to the repo map; a file opened from
       // there keeps a way back instead of being replaced by auto-follow.
-      if (overview && modules[state.current] === overview) {
+      if (overview && mapKindFor(modules[state.current])) {
         if (!target) { showRepoMap(); return; }
         code.mode = 'map-source';
       }
@@ -1535,7 +1536,7 @@
   async function loadSource(path, query) {
     if (code.mode !== 'map-source') code.mode = 'source';
     codeTitle.classList.remove('qz-title-plain');
-    mapBack.hidden = !(overview && modules[state.current] === overview);
+    mapBack.hidden = !(overview && mapKindFor(modules[state.current]));
     const data = await api('source', { path, base: changesState.base, ...query });
     code.path = data.path;
     code.start = data.start; code.end = data.end; code.total = data.total;
@@ -1659,8 +1660,10 @@
     if (!autoFollow || !wide() || !hasServer || views.guide.hidden) return;
     const section = modules[state.current];
     if (!section) return;
-    if (section === overview) {
-      if (code.mode !== 'map' && code.mode !== 'map-source') showRepoMap({ quiet: true });
+    const kind = overview && mapKindFor(section);
+    if (kind) {
+      if (code.mode === 'map-source') return;
+      if (code.mode !== 'map' || code.mapKind !== kind) showRepoMap({ quiet: true, kind });
       return;
     }
     if (code.mode === 'map' || code.mode === 'map-source') { code.mode = null; lastAuto = null; }
@@ -1742,8 +1745,39 @@
     return root;
   }
 
+  // Which files each study module covers: everything it anchors to, plus
+  // optional data-paths="dir/,file" on the module section.
+  function modulePaths() {
+    const map = new Map();
+    for (const section of studyModules()) {
+      const paths = new Set();
+      section.querySelectorAll('[data-src]').forEach((n) => paths.add(n.dataset.src));
+      (section.dataset.paths || '').split(',').map((p) => p.trim()).filter(Boolean).forEach((p) => paths.add(p));
+      map.set(section.dataset.module, paths);
+    }
+    return map;
+  }
+
+  // How well the reader knows a module: mastered 1, right-but-unsure 0.6,
+  // missed 0, averaged over answered questions (null if none answered).
+  const RESULT_WEIGHT = { mastered: 1, fragile: 0.6, gap: 0, misconception: 0 };
+  function moduleScore(section) {
+    const values = [...section.querySelectorAll('[data-q]')]
+      .map((q) => [q, state.answers[q.dataset.q]]).filter(([, a]) => a)
+      .map(([q, a]) => RESULT_WEIGHT[classify(a.choice === q.dataset.answer, a.confidence)]);
+    return values.length ? values.reduce((x, y) => x + y, 0) / values.length : null;
+  }
+  const scoreTone = (v) => (v == null ? 'none' : v >= 0.75 ? 'good' : v >= 0.4 ? 'ok' : 'bad');
+  const mean = (xs) => (xs.length ? xs.reduce((x, y) => x + y, 0) / xs.length : null);
+
+  // On the overview the map shows where modules live; on the final review
+  // and report it shows how well each part of the codebase is understood.
+  const mapKindFor = (section) => (section === overview ? 'modules' : isFinal(section) || isSummary(section) ? 'scores' : null);
+
   async function showRepoMap(opts = {}) {
+    const kind = opts.kind || mapKindFor(modules[state.current]) || 'modules';
     code.mode = 'map';
+    code.mapKind = kind;
     code.path = null;
     mapBack.hidden = true;
     markActive(null);
@@ -1751,40 +1785,90 @@
     shell.classList.add('qz-code-open');
     backdrop.hidden = wide();
     commentBox.hidden = true;
-    codeTitle.textContent = 'Repository map';
+    codeTitle.textContent = kind === 'scores' ? 'What you know, by location' : 'Repository map';
     focusStrip.hidden = true;
     codeTitle.classList.add('qz-title-plain');
-    codeInfo.textContent = 'Folders and what lives in them. Click a folder to expand it, or a file to open it.';
+    codeInfo.textContent = kind === 'scores'
+      ? 'Each folder and file is scored from your answers in the modules that cover it. Expand folders to drill in.'
+      : 'Folders and what lives in them. Numbered chips show which module covers each part. Expand folders as you like.';
     await outlineReady;
     if (code.mode !== 'map') return;
     const areas = new Map(areaRows().map((row) => [areaKey(row.dataset.area), row]));
+    const study = studyModules().filter((s) => !isSkipped(s));
+    const number = new Map(studyModules().map((s, i) => [s.dataset.module, i + 1]));
+    const scores = new Map(study.map((s) => [s.dataset.module, moduleScore(s)]));
+    const covered = modulePaths();
+    // file -> module ids covering it (a dir/ entry in data-paths covers everything below).
+    const fileModules = new Map();
+    for (const file of outlineFiles) {
+      const ids = study.map((s) => s.dataset.module).filter((id) =>
+        [...covered.get(id)].some((p) => p === file || (p.endsWith('/') && file.startsWith(p))));
+      if (ids.length) fileModules.set(file, ids);
+    }
     const tree = buildTree(outlineFiles);
+    const collect = (node) => {
+      node.modules = new Set();
+      node.scored = [];
+      for (const f of node.files) {
+        (fileModules.get(f) || []).forEach((id) => node.modules.add(id));
+        const fs = (fileModules.get(f) || []).map((id) => scores.get(id)).filter((v) => v != null);
+        if (fs.length) node.scored.push(mean(fs));
+      }
+      for (const d of node.dirs.values()) {
+        collect(d);
+        d.modules.forEach((id) => node.modules.add(id));
+        node.scored.push(...d.scored);
+      }
+      node.score = mean(node.scored);
+    };
+    collect(tree);
+
+    const chips = (ids) => el('span', { class: 'qz-mchips' }, [...ids].sort((a, b) => number.get(a) - number.get(b)).map((id) => {
+      const section = modules.find((m) => m.dataset.module === id);
+      return el('span', { class: `qz-mchip qz-mchip-${(number.get(id) - 1) % 8}`, title: section?.dataset.title || id, 'data-mod': id }, String(number.get(id)));
+    }));
+    const scoreBadge = (value) => el('span', { class: `qz-score qz-score-${scoreTone(value)}`,
+      title: value == null ? 'Not tested yet' : `${Math.round(value * 100)}% understood` }, value == null ? '—' : `${Math.round(value * 100)}%`);
+    const decorate = (ids, value) => (kind === 'scores' ? (ids.size || ids.length ? scoreBadge(value) : '') : (ids.size || ids.length ? chips(ids) : ''));
+
     const filter = el('input', { type: 'search', class: 'qz-filter qz-map-filter', placeholder: 'Filter folders and files', 'aria-label': 'Filter the repository map' });
-    const list = el('ul', { class: 'qz-map', role: 'tree' });
+    const list = el('ul', { class: `qz-map qz-map-${kind}`, role: 'tree' });
 
-    const fileItem = (file) => el('li', { role: 'treeitem', 'data-path': file, class: 'qz-map-file' },
-      el('button', { class: 'qz-linkish', type: 'button', onclick: (e) => openSource({ path: file }, e.currentTarget) },
-        file.split('/').pop()),
+    const fileItem = (file) => {
+      const ids = fileModules.get(file) || [];
+      const fileScores = ids.map((id) => scores.get(id)).filter((v) => v != null);
+      const value = mean(fileScores);
+      return el('li', {
+        role: 'treeitem', 'data-path': file, 'data-mods': ids.join(' '),
+        class: `qz-map-file${kind === 'scores' && ids.length ? ` qz-tint-${scoreTone(value)}` : ''}`,
+      },
+      el('div', { class: 'qz-map-row' },
+        el('button', { class: 'qz-linkish', type: 'button', onclick: (e) => openSource({ path: file }, e.currentTarget) }, file.split('/').pop()),
+        decorate(ids, value)),
       areas.has(file) ? el('div', { class: 'qz-map-desc', text: areaText(areas.get(file)) }) : '');
+    };
 
-    const dirItem = (node, depth) => {
+    const dirItem = (node) => {
       const row = areas.get(node.path);
-      const details = el('details', { open: depth === 0 || Boolean(row) && depth < 2 },
+      const details = el('details', {},
         el('summary', {},
-          el('span', { class: 'qz-map-name' }, `${node.name}/`),
-          el('span', { class: 'qz-dim', text: ` ${node.count} file${node.count === 1 ? '' : 's'}` }),
+          el('span', { class: 'qz-map-row' },
+            el('span', { class: 'qz-map-name' }, `${node.name}/`),
+            el('span', { class: 'qz-dim', text: ` ${node.count} file${node.count === 1 ? '' : 's'}` }),
+            decorate(node.modules, node.score)),
           row ? el('div', { class: 'qz-map-desc', text: areaText(row) }) : ''),
         el('ul', { role: 'group' },
-          [...node.dirs.values()].sort((a, b) => a.name.localeCompare(b.name)).map((d) => dirItem(d, depth + 1)),
+          [...node.dirs.values()].sort((a, b) => a.name.localeCompare(b.name)).map(dirItem),
           node.files.map(fileItem)));
-      const item = el('li', { role: 'treeitem', 'data-path': node.path, class: row ? 'qz-map-dir qz-map-known' : 'qz-map-dir' }, details);
-      if (row) {
-        details.querySelector('summary').addEventListener('click', () => flashArea(row));
-      }
+      const classes = ['qz-map-dir'];
+      if (row) classes.push('qz-map-known');
+      if (kind === 'scores' && node.modules.size) classes.push(`qz-tint-${scoreTone(node.score)}`);
+      const item = el('li', { role: 'treeitem', 'data-path': node.path, 'data-mods': [...node.modules].join(' '), class: classes.join(' ') }, details);
+      if (row) details.querySelector('summary').addEventListener('click', () => flashArea(row));
       return item;
     };
 
-    [...tree.dirs.values()].sort((a, b) => a.name.localeCompare(b.name)).forEach((d) => list.append(dirItem(d, 0)));
+    [...tree.dirs.values()].sort((a, b) => a.name.localeCompare(b.name)).forEach((d) => list.append(dirItem(d)));
     tree.files.forEach((f) => list.append(fileItem(f)));
     filter.addEventListener('input', () => {
       const q = filter.value.trim().toLowerCase();
@@ -1794,10 +1878,40 @@
         if (q && match) li.querySelectorAll(':scope > details').forEach((d) => { d.open = true; });
       });
     });
-    const known = areas.size;
-    codeBody.replaceChildren(el('div', { class: 'qz-map-wrap' },
-      filter,
-      known ? '' : el('p', { class: 'qz-dim', text: 'This guide has no folder descriptions yet; showing the plain tree.' }),
+
+    // Legend: click a module to show where it lives (expanding to its files).
+    const showModule = (id, button) => {
+      const active = button.classList.toggle('qz-legend-on');
+      legend.querySelectorAll('.qz-legend-item').forEach((b) => { if (b !== button) b.classList.remove('qz-legend-on'); });
+      list.querySelectorAll('.qz-map-mod').forEach((n) => n.classList.remove('qz-map-mod'));
+      list.querySelectorAll('details').forEach((d) => { d.open = false; });
+      if (!active) return;
+      list.querySelectorAll('li').forEach((li) => {
+        if (!(li.dataset.mods || '').split(' ').includes(id)) return;
+        li.classList.add('qz-map-mod');
+        if (li.classList.contains('qz-map-dir')) li.querySelector(':scope > details').open = true;
+      });
+    };
+    const legend = el('div', { class: 'qz-map-legend' });
+    if (kind === 'scores') {
+      legend.append(el('div', { class: 'qz-legend-scale' },
+        el('span', { class: 'qz-score qz-score-good' }, '75%+'), el('span', { text: 'solid' }),
+        el('span', { class: 'qz-score qz-score-ok' }, '40–74%'), el('span', { text: 'shaky' }),
+        el('span', { class: 'qz-score qz-score-bad' }, '<40%'), el('span', { text: 'missed' }),
+        el('span', { class: 'qz-score qz-score-none' }, '—'), el('span', { text: 'not tested' })));
+    }
+    legend.append(el('div', { class: 'qz-legend-mods' }, study.map((s) => {
+      const id = s.dataset.module;
+      const button = el('button', { class: 'qz-legend-item', type: 'button', title: 'Show where this module lives' },
+        el('span', { class: `qz-mchip qz-mchip-${(number.get(id) - 1) % 8}` }, String(number.get(id))),
+        el('span', { text: s.dataset.title || id }),
+        kind === 'scores' ? scoreBadge(scores.get(id)) : '');
+      button.addEventListener('click', () => showModule(id, button));
+      return button;
+    })));
+
+    codeBody.replaceChildren(el('div', { class: 'qz-map-wrap' }, legend, filter,
+      areas.size || kind === 'scores' ? '' : el('p', { class: 'qz-dim', text: 'This guide has no folder descriptions yet; showing the plain tree.' }),
       list));
     if (!opts.quiet) codeTitle.focus();
   }

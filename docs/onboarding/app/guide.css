@@ -778,3 +778,34 @@ html { scrollbar-color: var(--border) var(--bg); }
   border-radius: 999px; padding: 0.1rem 0.55rem;
 }
 .qz-focus-chip:hover { border-color: var(--accent); }
+
+/* Repository map: module chips, legend and understanding scores */
+.qz-map-row { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; }
+.qz-mchips { display: inline-flex; gap: 0.2rem; }
+.qz-mchip {
+  display: inline-grid; place-items: center; min-width: 1.15rem; height: 1.15rem; padding: 0 0.2rem;
+  border-radius: 999px; font: 700 0.68rem/1 var(--sans); color: #fff;
+}
+.qz-mchip-0 { background: #2f6fed; } .qz-mchip-1 { background: #0f8a5f; } .qz-mchip-2 { background: #b4531a; }
+.qz-mchip-3 { background: #8a3ccf; } .qz-mchip-4 { background: #c22f6b; } .qz-mchip-5 { background: #0e7c8c; }
+.qz-mchip-6 { background: #7a6a00; } .qz-mchip-7 { background: #5b6472; }
+.qz-map-legend { display: grid; gap: 0.5rem; margin-bottom: 0.6rem; }
+.qz-legend-mods { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.qz-legend-item {
+  display: inline-flex; align-items: center; gap: 0.35rem; font: inherit; font-size: 0.8rem; cursor: pointer;
+  border: 1px solid var(--border); background: var(--surface); color: var(--text); border-radius: 999px; padding: 0.15rem 0.55rem 0.15rem 0.2rem;
+}
+.qz-legend-item:hover, .qz-legend-on { border-color: var(--accent); background: var(--accent-soft); }
+.qz-legend-scale { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem 0.5rem; font-size: 0.78rem; color: var(--muted); }
+.qz-map-mod > details > summary, .qz-map-file.qz-map-mod { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }
+.qz-score {
+  display: inline-block; min-width: 2.6rem; text-align: center; font: 700 0.72rem/1.5 var(--sans);
+  border-radius: 999px; padding: 0 0.4rem; border: 1px solid;
+}
+.qz-score-good { color: var(--ok); background: var(--ok-soft); border-color: var(--ok); }
+.qz-score-ok { color: var(--warn); background: var(--warn-soft); border-color: var(--warn); }
+.qz-score-bad { color: var(--bad); background: var(--bad-soft); border-color: var(--bad); }
+.qz-score-none { color: var(--muted); background: var(--surface-2); border-color: var(--border); }
+.qz-map-scores .qz-tint-good > details > summary, .qz-map-scores .qz-map-file.qz-tint-good { box-shadow: inset 3px 0 0 var(--ok); }
+.qz-map-scores .qz-tint-ok > details > summary, .qz-map-scores .qz-map-file.qz-tint-ok { box-shadow: inset 3px 0 0 var(--warn); }
+.qz-map-scores .qz-tint-bad > details > summary, .qz-map-scores .qz-map-file.qz-tint-bad { box-shadow: inset 3px 0 0 var(--bad); background: color-mix(in srgb, var(--bad-soft) 60%, transparent); }

@@ -342,7 +342,15 @@ class BrowserTest(unittest.TestCase):
         self.wait("document.querySelector('.qz-map')")
         self.assertEqual(self.js("return document.querySelector('.qz-code-title').textContent"), "Repository map")
         self.assertIn("Application code.", self.js("return document.querySelector('li[data-path=\"src\"] .qz-map-desc').textContent"))
-        self.assertTrue(self.js("return document.querySelector('li[data-path=\"src/util\"] > details').open"))
+        # Collapsed by default, with chips for the modules that live there.
+        self.assertFalse(self.js("return [...document.querySelectorAll('.qz-map details')].some(d => d.open)"))
+        self.assertEqual(self.js("return [...document.querySelectorAll('li[data-path=\"src\"] > details > summary .qz-mchip')].map(c => c.textContent)"), ["1"])
+        self.assertEqual(self.js("return [...document.querySelectorAll('li[data-path=\"src/app.py\"] .qz-mchip')].map(c => c.title)"), ["m1"])
+        # The legend shows where a module lives.
+        self.js("document.querySelector('.qz-legend-item').click()")
+        self.assertTrue(self.js("return document.querySelector('li[data-path=\"src\"] > details').open"))
+        self.assertTrue(self.js("return document.querySelector('li[data-path=\"src/app.py\"]').classList.contains('qz-map-mod')"))
+        self.js("document.querySelector('.qz-legend-item').click()")
         # Clicking a table row highlights its folder; filtering narrows the tree.
         self.js("document.getElementById('area-src').click()")
         self.wait("document.querySelector('li[data-path=\"src\"].qz-map-hl')")
@@ -439,6 +447,38 @@ class BrowserTest(unittest.TestCase):
         # Listings in the guide get the same colours and key lines.
         self.assertEqual(self.js("return document.querySelector('.code-listing .tk-kw').textContent"), "def")
         self.assertTrue(self.js("return [...document.querySelectorAll('.code-listing .l')][2].classList.contains('qz-key')"))
+
+    def test_final_review_map_scores_by_location(self):
+        fx = Fixture()
+        self.addCleanup(fx.cleanup)
+        fx.write("lib/other.py", "def other():\n    return 2\n")
+        from support import OVERVIEW
+        overview = OVERVIEW.replace("</tbody>", '<tr data-plan="m2" data-importance="low" data-complexity="low" data-intensity="standard"><td>2</td><td>y</td></tr></tbody>')
+        q = lambda qid, ans: (f'<div data-q="{qid}" data-answer="{ans}"><p class="prompt">P</p>'
+                              '<ol class="choices"><li data-choice="a">a</li><li data-choice="b">b</li></ol></div>')
+        body = overview + f"""
+<section class="module" data-module="m1" data-title="App"><h2>App</h2><p><code data-src="src/app.py" data-sym="handler">h</code></p>{q("q1", "a")}{q("q2", "a")}</section>
+<section class="module" data-module="m2" data-title="Lib"><h2>Lib</h2><p><code data-src="lib/other.py" data-sym="other">o</code></p>{q("q3", "a")}</section>"""
+        fx.write_guide("guide.html", body)
+        app = serve.GuideApp(fx.root, fx.onboard / "guide.html", onboard_dir=fx.onboard)
+        self.serve(app)
+        self.js("document.querySelectorAll('.qz-modules a')[1].click()")
+        self.js("document.querySelector('[data-q=q1] input[value=a]').click(); document.querySelector('[data-q=q1] .qz-q-form input[value=sure]').click();"
+                "document.querySelector('[data-q=q2] input[value=a]').click(); document.querySelector('#module-m1 .qz-quiz-actions button').click();")
+        self.js("document.querySelectorAll('.qz-modules a')[2].click()")
+        self.answer("q3", "b", "sure")  # misconception: module Lib = 0%
+        self.js("[...document.querySelectorAll('.qz-modules a')].find(a => a.textContent.includes('Final review')).click()")
+        self.wait("document.querySelector('.qz-map-scores')")
+        self.assertEqual(self.js("return document.querySelector('.qz-code-title').textContent"), "What you know, by location")
+        score = lambda path: self.js(f"return document.querySelector('li[data-path=\"{path}\"] .qz-score').textContent")
+        tone = lambda path: self.js(f"return document.querySelector('li[data-path=\"{path}\"]').className")
+        # q1 right+sure (1.0) and q2 right+unrated (0.6): App 80%. q3 wrong+sure: Lib 0%.
+        self.assertEqual((score("src"), score("lib")), ("80%", "0%"))
+        self.assertIn("qz-tint-good", tone("src"))
+        self.assertIn("qz-tint-bad", tone("lib"))
+        self.assertTrue(self.js("return document.querySelector('li[data-path=\"docs\"] .qz-score') === null"))  # untested
+        legend = self.js("return [...document.querySelectorAll('.qz-legend-item')].map(b => b.textContent)")
+        self.assertEqual(legend, ["1App80%", "2Lib0%"])
 
     def test_code_pane_open_by_default_and_follows_scroll(self):
         fx = Fixture()
