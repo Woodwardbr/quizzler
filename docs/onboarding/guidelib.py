@@ -385,6 +385,7 @@ class Guide:
     listings: list[Listing] = field(default_factory=list)
     plan: list[PlanRow] = field(default_factory=list)
     refresh: list[PlanRow] = field(default_factory=list)
+    areas: list[tuple[str, int, str | None]] = field(default_factory=list)  # (path, line, module)
     overview: str | None = None
     final: str | None = None
     summary: str | None = None
@@ -494,6 +495,8 @@ class _GuideParser(html.parser.HTMLParser):
         if "data-plan" in a:
             g.plan.append(PlanRow(a["data-plan"], a.get("data-importance", ""), a.get("data-complexity", ""),
                                   a.get("data-intensity", ""), line))
+        if "data-area" in a:
+            g.areas.append((a["data-area"], line, module))
         if "data-refresh" in a:
             g.refresh.append(PlanRow(a["data-refresh"], a.get("data-importance", ""), a.get("data-complexity", ""),
                                      a.get("data-intensity", ""), line))

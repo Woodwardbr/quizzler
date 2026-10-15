@@ -303,6 +303,42 @@ class BrowserTest(unittest.TestCase):
         saved = json.loads(app.results_path.read_text())
         self.assertEqual((saved["refresh"], saved["round"]), ({"m1": "skim"}, 1))
 
+    def test_overview_shows_repository_map(self):
+        fx = Fixture()
+        self.addCleanup(fx.cleanup)
+        from support import OVERVIEW
+        fx.write("src/util/helpers.py", "def helper():\n    return 1\n")
+        overview = OVERVIEW.replace("<h2>Overview</h2>", """<h2>Overview</h2>
+  <table><thead><tr><th>Path</th><th>What</th></tr></thead><tbody>
+    <tr data-area="src/" id="area-src"><td>src/</td><td>Application code.</td></tr>
+    <tr data-area="src/util/"><td>src/util/</td><td>Small helpers.</td></tr>
+  </tbody></table>""")
+        fx.write_guide("guide.html", overview + """
+<section class="module" data-module="m1"><h2>One</h2><p><code data-src="src/app.py" data-ref="def handler(request):">handler</code></p></section>""")
+        app = serve.GuideApp(fx.root, fx.onboard / "guide.html", onboard_dir=fx.onboard)
+        self.serve(app)
+        # On the overview the pane is a repository map with descriptions.
+        self.wait("document.querySelector('.qz-map')")
+        self.assertEqual(self.js("return document.querySelector('.qz-code-title').textContent"), "Repository map")
+        self.assertIn("Application code.", self.js("return document.querySelector('li[data-path=\"src\"] .qz-map-desc').textContent"))
+        self.assertTrue(self.js("return document.querySelector('li[data-path=\"src/util\"] > details').open"))
+        # Clicking a table row highlights its folder; filtering narrows the tree.
+        self.js("document.getElementById('area-src').click()")
+        self.wait("document.querySelector('li[data-path=\"src\"].qz-map-hl')")
+        self.js("const f = document.querySelector('.qz-map-filter'); f.value = 'helpers'; f.dispatchEvent(new Event('input'))")
+        self.assertTrue(self.js("return document.querySelector('li[data-path=\"src/app.py\"]').hidden"))
+        self.assertFalse(self.js("return document.querySelector('li[data-path=\"src/util/helpers.py\"]').hidden"))
+        # Opening a file keeps a way back to the map, and auto-follow does not undo it.
+        self.js("document.querySelector('li[data-path=\"src/util/helpers.py\"] button').click()")
+        self.wait("document.querySelector('.qz-code-title').textContent === 'src/util/helpers.py'")
+        time.sleep(1)
+        self.assertEqual(self.js("return document.querySelector('.qz-code-title').textContent"), "src/util/helpers.py")
+        self.js("[...document.querySelectorAll('.qz-code button')].find(b => b.textContent.includes('Repository map')).click()")
+        self.wait("document.querySelector('.qz-map')")
+        # Leaving the overview switches the pane back to code.
+        self.js("document.querySelectorAll('.qz-modules a')[1].click()")
+        self.wait("document.querySelector('.qz-code-title').textContent === 'src/app.py'")
+
     def test_code_pane_open_by_default_and_follows_scroll(self):
         fx = Fixture()
         self.addCleanup(fx.cleanup)

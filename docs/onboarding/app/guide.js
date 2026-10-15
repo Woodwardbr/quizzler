@@ -1161,10 +1161,13 @@
   const codeBody = el('div', { class: 'qz-code-body' });
   const commentBox = el('div', { class: 'qz-comment-box', hidden: true });
 
+  const mapBack = el('button', { class: 'qz-btn', type: 'button', hidden: true, onclick: () => showRepoMap() }, '← Repository map');
+
   function buildCodePane() {
     codePane.append(
       el('div', { class: 'qz-code-head' }, codeTitle,
-        el('button', { class: 'qz-btn', type: 'button', 'aria-label': 'Close source', onclick: closeSource }, 'Close')),
+        el('div', { class: 'qz-row qz-code-head-actions' }, mapBack,
+          el('button', { class: 'qz-btn', type: 'button', 'aria-label': 'Close source', onclick: closeSource }, 'Close'))),
       codeInfo, commentBox, codeBody);
     codePane.addEventListener('keydown', (event) => { if (event.key === 'Escape') closeSource(); });
   }
@@ -1181,6 +1184,12 @@
       code.returnFocus = trigger || document.activeElement;
       autoFollow = true;
       code.userOpened = true;
+      // On the overview the pane belongs to the repo map; a file opened from
+      // there keeps a way back instead of being replaced by auto-follow.
+      if (overview && modules[state.current] === overview) {
+        if (!target) { showRepoMap(); return; }
+        code.mode = 'map-source';
+      }
     }
     codePane.hidden = false;
     shell.classList.add('qz-code-open');
@@ -1229,6 +1238,9 @@
   }
 
   async function loadSource(path, query) {
+    if (code.mode !== 'map-source') code.mode = 'source';
+    codeTitle.classList.remove('qz-title-plain');
+    mapBack.hidden = !(overview && modules[state.current] === overview);
     const data = await api('source', { path, base: changesState.base, ...query });
     code.path = data.path;
     code.start = data.start; code.end = data.end; code.total = data.total;
@@ -1313,6 +1325,11 @@
     if (!autoFollow || !wide() || !hasServer || views.guide.hidden) return;
     const section = modules[state.current];
     if (!section) return;
+    if (section === overview) {
+      if (code.mode !== 'map' && code.mode !== 'map-source') showRepoMap({ quiet: true });
+      return;
+    }
+    if (code.mode === 'map' || code.mode === 'map-source') { code.mode = null; lastAuto = null; }
     const refs = [...section.querySelectorAll('.qz-ref[data-src], .qz-ref-listing')].filter((n) => n.offsetParent !== null);
     if (!refs.length) return;
     const line = window.innerHeight * 0.4;
@@ -1354,6 +1371,131 @@
     if (code.returnFocus && document.contains(code.returnFocus)) code.returnFocus.focus();
   }
 
+  // -------------------------------------------------------- repo map
+  // On the overview the pane shows the repository's folders and what lives
+  // in them. Descriptions come from overview elements with data-area="dir/"
+  // (usually rows of a "where things live" table); hovering or clicking
+  // such a row highlights its folder, and the map links back to the row.
+  let outlineReady = null;
+  const areaRows = () => (overview ? [...overview.querySelectorAll('[data-area]')] : []);
+  const areaKey = (path) => path.replace(/\/+$/, '');
+
+  function areaText(row) {
+    if (row.dataset.areaDesc) return row.dataset.areaDesc;
+    const cells = [...row.children];
+    if (row.tagName === 'TR' && cells.length > 1) return cells.slice(1).map((c) => c.textContent.trim()).join(' ').trim();
+    return row.textContent.trim();
+  }
+
+  function buildTree(files) {
+    const root = { name: '', path: '', dirs: new Map(), files: [], count: 0 };
+    for (const file of files) {
+      const parts = file.split('/');
+      let node = root;
+      node.count += 1;
+      for (const part of parts.slice(0, -1)) {
+        const path = node.path ? `${node.path}/${part}` : part;
+        if (!node.dirs.has(part)) node.dirs.set(part, { name: part, path, dirs: new Map(), files: [], count: 0 });
+        node = node.dirs.get(part);
+        node.count += 1;
+      }
+      node.files.push(file);
+    }
+    return root;
+  }
+
+  async function showRepoMap(opts = {}) {
+    code.mode = 'map';
+    code.path = null;
+    mapBack.hidden = true;
+    markActive(null);
+    codePane.hidden = false;
+    shell.classList.add('qz-code-open');
+    backdrop.hidden = wide();
+    commentBox.hidden = true;
+    codeTitle.textContent = 'Repository map';
+    codeTitle.classList.add('qz-title-plain');
+    codeInfo.textContent = 'Folders and what lives in them. Click a folder to expand it, or a file to open it.';
+    await outlineReady;
+    if (code.mode !== 'map') return;
+    const areas = new Map(areaRows().map((row) => [areaKey(row.dataset.area), row]));
+    const tree = buildTree(outlineFiles);
+    const filter = el('input', { type: 'search', class: 'qz-filter qz-map-filter', placeholder: 'Filter folders and files', 'aria-label': 'Filter the repository map' });
+    const list = el('ul', { class: 'qz-map', role: 'tree' });
+
+    const fileItem = (file) => el('li', { role: 'treeitem', 'data-path': file, class: 'qz-map-file' },
+      el('button', { class: 'qz-linkish', type: 'button', onclick: (e) => openSource({ path: file }, e.currentTarget) },
+        file.split('/').pop()),
+      areas.has(file) ? el('div', { class: 'qz-map-desc', text: areaText(areas.get(file)) }) : '');
+
+    const dirItem = (node, depth) => {
+      const row = areas.get(node.path);
+      const details = el('details', { open: depth === 0 || Boolean(row) && depth < 2 },
+        el('summary', {},
+          el('span', { class: 'qz-map-name' }, `${node.name}/`),
+          el('span', { class: 'qz-dim', text: ` ${node.count} file${node.count === 1 ? '' : 's'}` }),
+          row ? el('div', { class: 'qz-map-desc', text: areaText(row) }) : ''),
+        el('ul', { role: 'group' },
+          [...node.dirs.values()].sort((a, b) => a.name.localeCompare(b.name)).map((d) => dirItem(d, depth + 1)),
+          node.files.map(fileItem)));
+      const item = el('li', { role: 'treeitem', 'data-path': node.path, class: row ? 'qz-map-dir qz-map-known' : 'qz-map-dir' }, details);
+      if (row) {
+        details.querySelector('summary').addEventListener('click', () => flashArea(row));
+      }
+      return item;
+    };
+
+    [...tree.dirs.values()].sort((a, b) => a.name.localeCompare(b.name)).forEach((d) => list.append(dirItem(d, 0)));
+    tree.files.forEach((f) => list.append(fileItem(f)));
+    filter.addEventListener('input', () => {
+      const q = filter.value.trim().toLowerCase();
+      list.querySelectorAll('li').forEach((li) => {
+        const match = !q || li.dataset.path.toLowerCase().includes(q) || li.textContent.toLowerCase().includes(q);
+        li.hidden = !match;
+        if (q && match) li.querySelectorAll(':scope > details').forEach((d) => { d.open = true; });
+      });
+    });
+    const known = areas.size;
+    codeBody.replaceChildren(el('div', { class: 'qz-map-wrap' },
+      filter,
+      known ? '' : el('p', { class: 'qz-dim', text: 'This guide has no folder descriptions yet; showing the plain tree.' }),
+      list));
+    if (!opts.quiet) codeTitle.focus();
+  }
+
+  function highlightArea(path, scroll) {
+    if (code.mode !== 'map') return;
+    codeBody.querySelectorAll('.qz-map-hl').forEach((n) => n.classList.remove('qz-map-hl'));
+    const item = codeBody.querySelector(`li[data-path="${CSS.escape(areaKey(path))}"]`);
+    if (!item) return;
+    item.classList.add('qz-map-hl');
+    for (let n = item; n && n !== codeBody; n = n.parentElement) if (n.tagName === 'DETAILS') n.open = true;
+    item.querySelector(':scope > details')?.setAttribute('open', '');
+    if (scroll) {
+      const top = item.getBoundingClientRect().top - codeBody.getBoundingClientRect().top + codeBody.scrollTop;
+      codeBody.scrollTop = Math.max(0, top - 40);
+    }
+  }
+
+  function flashArea(row) {
+    row.classList.add('qz-area-flash');
+    row.scrollIntoView({ block: 'nearest' });
+    setTimeout(() => row.classList.remove('qz-area-flash'), 1200);
+  }
+
+  function buildAreas() {
+    for (const row of areaRows()) {
+      row.classList.add('qz-area');
+      row.title = `Show ${row.dataset.area} in the repository map`;
+      row.addEventListener('mouseenter', () => highlightArea(row.dataset.area, false));
+      row.addEventListener('click', (event) => {
+        if (event.target.closest('.qz-ref, a, button')) return;
+        if (code.mode !== 'map') showRepoMap({ quiet: true }).then(() => highlightArea(row.dataset.area, true));
+        else highlightArea(row.dataset.area, true);
+      });
+    }
+  }
+
   // ------------------------------------------------------ outline/search
   const filterInput = el('input', { type: 'search', class: 'qz-filter', id: 'qz-filter', placeholder: 'Filter  ( / )', 'aria-label': 'Filter modules, references and files' });
   const refList = el('ul', { class: 'qz-reflist' });
@@ -1393,7 +1535,12 @@
     loadOutline();
   }
 
-  async function loadOutline() {
+  function loadOutline() {
+    outlineReady = fetchOutline();
+    return outlineReady;
+  }
+
+  async function fetchOutline() {
     if (!hasServer) {
       outlineFiles = [...new Set([...guideRoot.querySelectorAll('[data-src]')].map((n) => n.dataset.src))].sort();
     } else {
@@ -1644,6 +1791,7 @@
     modules.forEach(buildFindings);
     buildListings();
     buildAnchors();
+    buildAreas();
     buildSide();
     if (hasServer) {
       try {
