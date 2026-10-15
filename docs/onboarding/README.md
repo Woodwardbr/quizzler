@@ -163,6 +163,12 @@ The steps:
 4. The session writes the content, runs `relay.py done <ids>`, and starts waiting again.
 5. The page reloads **once, when the request is done**, so it never shows a half-written guide. If you're typing, it offers a reload button instead.
 
+### Final review and report styling
+
+The engine boxes each `<h3>` sub-section of the final review and the final report into a card, coloured by the h3's class: `got` (green ✓), `missed` (red ✗), `shaky` (amber ~) or `plan` (blue). Headings without a class are coloured by keywords. List items with class `got`, `missed` or `shaky` get matching colours and icons, and `<span class="right-idea">` adds a "Right idea:" line under a miss.
+
+The engine also adds a **Question by question** card: every question in the plan, per module, with your answer against the correct one and a colour-coded result. Until the review is written, the final page shows the scoreboard, this breakdown, and a **Generate review** button that explains the two choices that follow: keep learning, or call it a day.
+
 ### Repository map (overview)
 
 While the reader is on the overview, the source pane shows a **repository map** instead of code: a folder tree of the repo, built from the files the path policy allows, with file counts.

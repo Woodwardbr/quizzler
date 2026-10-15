@@ -274,7 +274,15 @@ class BrowserTest(unittest.TestCase):
         self.wait("document.querySelector('#module-final-review table')")
         row = self.js("return [...document.querySelectorAll('#module-final-review tbody td')].map(td => td.textContent)")
         self.assertEqual(row, ["Module onestandard", "1 of 2", "1 mastered"])
-        self.js("[...document.querySelectorAll('#module-final-review button')].find(b => b.textContent.includes('Generate')).click()")
+        # Question by question: colour-coded results.
+        results = self.js("return [...document.querySelectorAll('#module-final-review .qz-result')].map(r => [r.dataset.result, r.className])")
+        self.assertEqual([r[0] for r in results], ["mastered", "unanswered"])
+        self.assertIn("qz-result-got", results[0][1])
+        # The button says what it does and what comes after.
+        gen = self.js("return document.querySelector('.qz-generate-review').textContent")
+        self.assertIn("keep learning", gen)
+        self.assertIn("call it a day", gen)
+        self.js("[...document.querySelectorAll('#module-final-review button')].find(b => b.textContent === 'Generate review').click()")
         self.wait("document.querySelector('#module-final-review .qz-work')")
         deadline = time.monotonic() + 5
         while time.monotonic() < deadline and not gl.update_requests(app.requests_path):
@@ -282,6 +290,10 @@ class BrowserTest(unittest.TestCase):
         self.assertEqual([r["action"] for r in gl.update_requests(app.requests_path)], ["final-review"])
         # Claude writes the final review with a refresh plan; the page reloads into it.
         final = """<section class="module" data-module="final-review" data-final data-title="Final review"><h2>Final review</h2>
+  <div class="key-points"><h3>Verdict</h3><ul><li>Good start.</li></ul></div>
+  <h3 class="got">What you've got</h3><ul><li class="got">The handler.</li></ul>
+  <h3 class="missed">What you missed</h3><ul><li class="missed">You skipped q2.<span class="right-idea">Pick a.</span></li></ul>
+  <h3 class="plan">Refresh plan</h3>
   <table><thead><tr><th>Module</th><th>Why</th></tr></thead><tbody>
   <tr data-refresh="m1" data-intensity="deep"><td>Module one</td><td>missed q2</td></tr></tbody></table></section>"""
         head, tail = guide.read_text().rsplit("</main>", 1)
@@ -290,6 +302,13 @@ class BrowserTest(unittest.TestCase):
         relay.mark_done(app.requests_path, None)  # Claude marks the request done; only then does the page reload
         self.wait("document.querySelector('#module-final-review [data-refresh] select')", timeout=20)
         self.assertEqual(self.js("return document.querySelector('[data-refresh] select').value"), "deep")
+        cards = self.js("return [...document.querySelectorAll('#module-final-review > .qz-review-card')].map(c => [c.className, c.querySelector('h3').textContent])")
+        self.assertEqual(cards, [["qz-review-card qz-tone-neutral", "Question by question"],
+                                 ["qz-review-card qz-tone-got", "What you've got"],
+                                 ["qz-review-card qz-tone-missed", "What you missed"],
+                                 ["qz-review-card qz-tone-plan", "Refresh plan"]])
+        self.assertTrue(self.js("return Boolean(document.querySelector('.qz-tone-plan [data-refresh] select'))"))
+        self.assertEqual(self.js("return getComputedStyle(document.querySelector('li.missed'), '::before').content"), '"✗"')
         self.js("const s = document.querySelector('[data-refresh] select'); s.value = 'skim'; s.dispatchEvent(new Event('change'))")
         buttons = self.js("return [...document.querySelectorAll('.qz-final-actions button')].map(b => b.textContent)")
         self.assertEqual(buttons, ["Write my final report", "Start round 2"])

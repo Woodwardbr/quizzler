@@ -366,7 +366,7 @@
       const { total } = moduleProgress(section);
       return { section, id, counts, answered, total };
     });
-    const CHIP = [['mastered', 'mastered', 'low'], ['fragile', 'fragile', 'medium'], ['gap', 'gaps', 'high'], ['misconception', 'misconceptions', 'high']];
+    const CHIP = [['mastered', 'mastered', 'low'], ['fragile', 'fragile', 'medium'], ['gap', 'gap', 'high'], ['misconception', 'misconception', 'high']];
     const table = el('table', { class: 'qz-scoreboard' },
       el('thead', {}, el('tr', {}, ['Module', 'Answered', 'Results'].map((h) => el('th', { text: h })))),
       el('tbody', {}, rows.map((r) => el('tr', {},
@@ -374,7 +374,8 @@
           r.section.dataset.title || r.id), el('div', { class: 'qz-plan-desc', text: intensityOf(r.id) })),
         el('td', { text: isSkipped(r.section) ? 'skipped' : `${r.answered} of ${r.total}` }),
         el('td', {}, CHIP.filter(([key]) => r.counts[key]).map(([key, label, tone]) =>
-          el('span', { class: `qz-rating qz-rating-${tone}`, 'data-result': key }, `${r.counts[key]} ${label}`)),
+          el('span', { class: `qz-rating qz-rating-${tone}`, 'data-result': key },
+            `${r.counts[key]} ${label}${r.counts[key] > 1 && ['gap', 'misconception'].includes(key) ? 's' : ''}`)),
         r.answered ? '' : el('span', { class: 'qz-dim', text: '–' }))))));
     return { table: el('div', { class: 'table-wrap' }, table), rows };
   }
@@ -391,21 +392,102 @@
           el('li', {}, unanswered ? `${unanswered} question${unanswered === 1 ? '' : 's'} still unanswered.` : 'Every question in your plan is answered.'),
           unwritten ? el('li', {}, `${unwritten} module${unwritten === 1 ? ' is' : 's are'} not written to your chosen depth yet.`) : '')),
       el('h3', { text: 'Your answers so far' }), table,
-      el('h3', { text: 'Get your final review' }),
-      el('ol', {},
-        el('li', {}, 'Claude reviews what you got and what you missed, module by module.'),
-        el('li', {}, 'It recommends how hard to revisit each module. You can change any of them.'),
-        el('li', {}, 'Then either go back over what you missed, or call it a day with a final report of how well you know each part of the codebase.')),
-      el('div', { class: 'qz-row' },
-        el('button', { class: 'qz-btn qz-primary', type: 'button', disabled: !hasServer || work.has('final-review'), onclick: () => requestWork('final-review') }, 'Generate my final review'),
-        unanswered ? el('span', { class: 'qz-dim', text: 'You can generate it now; unanswered questions count as not covered.' }) : ''));
+      el('h3', { text: 'Question by question' }),
+      questionBreakdown(),
+      el('div', { class: 'qz-generate qz-generate-review' },
+        el('button', { class: 'qz-btn qz-primary qz-btn-big', type: 'button', disabled: !hasServer || work.has('final-review'), onclick: () => requestWork('final-review') }, 'Generate review'),
+        el('ol', { class: 'qz-next-steps' },
+          el('li', {}, 'Claude reviews what you got right and wrong in each module, and explains the right idea for anything you missed.'),
+          el('li', {}, 'It suggests how hard to revisit each module. You can change any of them.'),
+          el('li', {}, el('strong', { text: 'Then you choose: ' }), 'keep learning (a new round focused on what you missed) or call it a day (a final report on how well you know each part of the codebase).')),
+        unanswered ? el('p', { class: 'qz-dim', text: `${unanswered} unanswered question${unanswered === 1 ? '' : 's'} will count as not covered. You can answer them first, or generate now.` }) : ''));
     if (!hasServer) section.append(el('p', { class: 'qz-dim', text: 'Generating needs the local guide server (serve.py).' }));
+  }
+
+  // Every question in the plan, per module, colour-coded by result.
+  const RESULT = {
+    mastered: ['✓', 'Mastered', 'got'], fragile: ['~', 'Right, but not sure', 'shaky'],
+    gap: ['✗', 'Missed', 'missed'], misconception: ['✗', 'Missed, and you were sure', 'missed'],
+    unanswered: ['–', 'Not answered', 'none'],
+  };
+
+  function choiceText(question, value) {
+    const label = question.querySelector(`.qz-choice[data-choice="${CSS.escape(value)}"] .qz-choice-body`);
+    return label ? label.textContent.trim() : value;
+  }
+
+  function questionBreakdown() {
+    const wrap = el('div', { class: 'qz-breakdown' });
+    for (const section of studyModules()) {
+      if (isSkipped(section)) continue;
+      const questions = [...section.querySelectorAll('[data-q]')].filter((q) => !q.dataset.retired && !q.closest('.qz-depth-hidden'));
+      if (!questions.length) continue;
+      const rows = questions.map((q) => {
+        const a = state.answers[q.dataset.q];
+        const level = a ? classify(a.choice === q.dataset.answer, a.confidence) : 'unanswered';
+        const [icon, label, tone] = RESULT[level];
+        const prompt = q.querySelector('.prompt')?.textContent.trim() || q.dataset.q;
+        const detail = !a ? 'No answer yet.'
+          : a.choice === q.dataset.answer ? `You answered: ${choiceText(q, a.choice)}`
+            : `You answered: ${choiceText(q, a.choice)} · Correct: ${choiceText(q, q.dataset.answer)}`;
+        return el('li', { class: `qz-result qz-result-${tone}`, 'data-result': level },
+          el('span', { class: 'qz-result-icon', 'aria-hidden': 'true', text: icon }),
+          el('div', {}, el('div', { class: 'qz-result-prompt', text: prompt }),
+            el('div', { class: 'qz-result-detail' }, el('span', { class: 'qz-result-label', text: label }), ` · ${detail}`)));
+      });
+      const got = rows.filter((r) => r.dataset.result === 'mastered').length;
+      wrap.append(el('div', { class: 'qz-review-card qz-tone-neutral' },
+        el('div', { class: 'qz-review-card-head' },
+          el('a', { href: `#${section.id}`, onclick: (e) => { e.preventDefault(); goTo(modules.indexOf(section), true); } }, section.dataset.title || section.dataset.module),
+          el('span', { class: 'qz-dim', text: `${got} of ${rows.length} mastered` })),
+        el('ul', { class: 'qz-results' }, rows)));
+    }
+    if (!wrap.childElementCount) wrap.append(el('p', { class: 'qz-dim', text: 'No questions in your plan yet.' }));
+    return wrap;
+  }
+
+  // Claude's review and report: every <h3> sub-section becomes a boxed card
+  // whose colour says what it is (h3 class got/missed/shaky/plan, or a
+  // keyword in the heading as a fallback).
+  function toneOf(h3) {
+    for (const tone of ['got', 'missed', 'shaky', 'plan']) if (h3.classList.contains(tone)) return tone;
+    const text = h3.textContent.toLowerCase();
+    if (/missed|wrong|gap|misconception/.test(text)) return 'missed';
+    if (/shaky|fragile|improv|still|later/.test(text)) return 'shaky';
+    if (/got|right|know|can now|strength|solid/.test(text)) return 'got';
+    if (/plan|revisit|next/.test(text)) return 'plan';
+    return 'neutral';
+  }
+
+  function cardify(section) {
+    const heads = [...section.children].filter((n) => n.tagName === 'H3');
+    for (const h3 of heads) {
+      const card = el('section', { class: `qz-review-card qz-tone-${toneOf(h3)}` });
+      const head = el('div', { class: 'qz-review-card-head' });
+      h3.before(card);
+      head.append(h3);
+      card.append(head);
+      let next = card.nextSibling;
+      while (next && !(next.nodeType === 1 && (next.tagName === 'H3' || next.matches('.qz-final-actions, .qz-review-card')))) {
+        const move = next;
+        next = next.nextSibling;
+        card.append(move);
+      }
+    }
   }
 
   function buildFinal() {
     const final = modules.find(isFinal);
     if (!final) return;
+    for (const report of modules.filter(isSummary)) cardify(report);
     if (final.dataset.stub !== undefined) { renderFinalStub(final); return; }
+    cardify(final);
+    // The objective per-question breakdown, after Claude's verdict.
+    const glance = el('section', { class: 'qz-review-card qz-tone-neutral' },
+      el('div', { class: 'qz-review-card-head' }, el('h3', { text: 'Question by question' })),
+      questionBreakdown());
+    const verdict = final.querySelector(':scope > .key-points');
+    (verdict || final.querySelector(':scope > h2')).after(glance);
     // Authored final review: refresh plan dropdowns and the next-step buttons.
     const table = final.querySelector('[data-refresh]')?.closest('table');
     if (table) {
@@ -764,6 +846,7 @@
     state.current = index;
     modules.forEach((section, i) => { section.hidden = i !== index; });
     if (modules[index].dataset.stub !== undefined) renderFinalStub(modules[index]);
+    else if (isFinal(modules[index])) modules[index].querySelector('.qz-breakdown')?.replaceWith(questionBreakdown());
     helpBox.hidden = true;
     renderPager(index);
     updateModuleNav();
@@ -1780,7 +1863,6 @@
     buildShell();
     buildModules();
     buildPlan();
-    buildFinal();
     buildCodePane();
     await loadSaved();
     guideRoot.querySelectorAll('[data-q]').forEach(buildQuestion);
@@ -1788,6 +1870,7 @@
     guideRoot.querySelectorAll('.exercise[data-exercise]').forEach(buildExercise);
     syncPlanSelects();
     applyPlan();
+    buildFinal();
     modules.forEach(buildFindings);
     buildListings();
     buildAnchors();
