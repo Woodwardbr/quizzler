@@ -63,6 +63,7 @@ def record_results(directory: Path, payload: dict, guide: gl.Guide | None) -> di
         "recorded_at": dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat(),
         "answers": graded, "exercises": exercises, "findings": findings,
         "comments": len(payload.get("comments") or []),
+        "plan": {str(k): v for k, v in (payload.get("plan") or {}).items() if v in gl.INTENSITIES},
     }
     progress_path = directory / "progress.json"
     progress = _load(progress_path)
@@ -104,6 +105,8 @@ def render_markdown(progress: dict, guide: gl.Guide | None) -> str:
         summary = summarize(entry)
         counts = ", ".join(f"{k} {v}" for k, v in summary["counts"].items())
         lines += [f"## Version {entry['version']} ({entry['recorded_at']})", "", f"Answers: {counts}.", ""]
+        if entry.get("plan"):
+            lines += ["Study plan: " + ", ".join(f"{m} {i}" for m, i in entry["plan"].items()) + ".", ""]
         if entry["answers"]:
             lines += ["| Question | Module | Result | Confidence | Class |", "|---|---|---|---|---|"]
             for qid, rec in sorted(entry["answers"].items()):
@@ -133,6 +136,14 @@ def report(directory: Path, guide: gl.Guide | None) -> str:
     entry = progress["history"][-1]
     out = [f"Targets for the next version of {progress.get('guide')} (from v{entry['version']}):", ""]
     titles = guide.module_titles if guide else {}
+    plan = entry.get("plan") or {}
+    if plan:
+        recommended = {row.module: row.intensity for row in guide.plan} if guide else {}
+        out.append("Reader's study plan (write each module at this depth; keep skipped modules short and unquizzed):")
+        for module, intensity in plan.items():
+            note = "" if recommended.get(module) in (None, intensity) else f" (recommended {recommended[module]})"
+            out.append(f"  - {module}: {intensity}{note}")
+        out.append("")
     modules: dict[str, list] = {}
     for qid, rec in entry["answers"].items():
         modules.setdefault(rec.get("module") or "(unknown)", []).append((qid, rec))

@@ -20,6 +20,7 @@ class AdaptiveLoopTest(unittest.TestCase):
                 "q2": {"choice": "b", "confidence": "sure", "reasoning": "I thought b"},
             },
             "exercises": {"hello": {"prediction": "hello 41", "ran": True, "matched": False}},
+            "plan": {"m1": "deep"},
         }
 
     def tearDown(self):
@@ -40,6 +41,7 @@ class AdaptiveLoopTest(unittest.TestCase):
         self.assertIn("MISCONCEPTION q2 (chose b, answer a)", text)
         self.assertIn("reasoning: I thought b", text)
         self.assertIn("Retire in the next version: q1", text)
+        self.assertIn("m1: deep (recommended standard)", text)
 
         result = progress.bump(self.guide_path, directory, self.local)
         self.assertEqual((result["version"], result["retired"]), (2, ["q1"]))

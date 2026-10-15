@@ -85,6 +85,34 @@ def check_guide(guide_path: Path, repo_root: Path, report: Report, *,
     if not guide.modules:
         report.error(name, "guide has no <section class=\"module\" data-module=...>")
 
+    # The overview opens an onboarding guide: what the repo is, where things
+    # live, and a study plan the reader can adjust. It has no quiz.
+    if guide.mode == "onboard" and guide.modules and guide.overview != guide.modules[0]:
+        report.error(name, "onboarding guides must start with an overview module "
+                           "(<section class=\"module\" data-overview ...>)")
+    if guide.overview:
+        if any(q.module == guide.overview for q in guide.questions):
+            report.error(name, "the overview module must not contain questions")
+        planned = [row.module for row in guide.plan]
+        for row in guide.plan:
+            where = f"{name}:{row.line}"
+            if row.module not in guide.modules or row.module == guide.overview:
+                report.error(where, f"plan row data-plan={row.module!r} is not a later module")
+            for attr, value in (("importance", row.importance), ("complexity", row.complexity)):
+                if value not in gl.RATINGS:
+                    report.error(where, f"plan row {row.module}: data-{attr} must be one of {gl.RATINGS}")
+            if row.intensity not in gl.INTENSITIES:
+                report.error(where, f"plan row {row.module}: data-intensity must be one of {gl.INTENSITIES}")
+        missing = [m for m in guide.modules if m != guide.overview and m not in planned]
+        if missing:
+            report.error(name, f"overview plan has no row for: {', '.join(missing)}")
+        dupes = sorted({m for m in planned if planned.count(m) > 1})
+        if dupes:
+            report.error(name, f"overview plan lists modules twice: {', '.join(dupes)}")
+    for depth, line in guide.depths:
+        if depth not in gl.DEPTHS:
+            report.error(f"{name}:{line}", f"data-depth must be one of {gl.DEPTHS}")
+
     for q in guide.questions:
         where = f"{name}:{q.line}"
         if q.module is None:

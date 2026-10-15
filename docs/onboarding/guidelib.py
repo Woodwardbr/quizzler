@@ -31,6 +31,9 @@ GUIDE_MODES = ("onboard", "review")
 CONFIDENCE_LEVELS = ("sure", "unsure", "guess")
 FINDING_RESPONSES = ("agree", "unsure", "disagree")
 COMMENT_STATES = ("ready", "needs-another-look", "not-posting")
+RATINGS = ("low", "medium", "high")
+INTENSITIES = ("skip", "skim", "standard", "deep")
+DEPTHS = ("standard", "deep")  # data-depth: shown at this intensity and above
 RESULT_PREFIXES = {"QUIZZLER-ONBOARD": "onboard", "QUIZZLER-REVIEW": "review"}
 PREVIEW_PREFIX = "QUIZZLER-PREVIEW"
 
@@ -346,6 +349,17 @@ class Finding:
 
 
 @dataclass
+class PlanRow:
+    """One row of the overview's study plan: a module, its ratings and the
+    recommended intensity (the reader can change it in the page)."""
+    module: str
+    importance: str
+    complexity: str
+    intensity: str
+    line: int
+
+
+@dataclass
 class Listing:
     """A code listing (``figure.code-listing``) whose text is checked against source."""
     path: str | None
@@ -365,6 +379,9 @@ class Guide:
     findings: list[Finding] = field(default_factory=list)
     exercises: list[str] = field(default_factory=list)
     listings: list[Listing] = field(default_factory=list)
+    plan: list[PlanRow] = field(default_factory=list)
+    overview: str | None = None
+    depths: list[tuple[str, int]] = field(default_factory=list)
     assets: list[str] = field(default_factory=list)
     inline_scripts: list[int] = field(default_factory=list)
     has_main: bool = False
@@ -424,6 +441,8 @@ class _GuideParser(html.parser.HTMLParser):
                 g.inline_scripts.append(line)
         if "data-module" in a and tag == "section":
             frame["module"] = a["data-module"]
+            if "data-overview" in a:
+                g.overview = a["data-module"]
             g.modules.append(a["data-module"])
             g.module_titles[a["data-module"]] = a.get("data-title", a["data-module"])
         module = frame.get("module") or self._ctx("module")
@@ -445,6 +464,11 @@ class _GuideParser(html.parser.HTMLParser):
             frame["finding_title"] = finding
         if finding is not None and "comment-draft" in classes:
             frame["finding_draft"] = finding
+        if "data-plan" in a:
+            g.plan.append(PlanRow(a["data-plan"], a.get("data-importance", ""), a.get("data-complexity", ""),
+                                  a.get("data-intensity", ""), line))
+        if "data-depth" in a:
+            g.depths.append((a["data-depth"], line))
         if "data-exercise" in a:
             g.exercises.append(a["data-exercise"])
             frame["exercise"] = a["data-exercise"]

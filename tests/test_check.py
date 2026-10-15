@@ -99,7 +99,7 @@ class DriftGateTest(unittest.TestCase):
   <div class="exercise" data-exercise="hello"><figure class="code-listing"><pre><code><span class="l">print("hello", 6 * 7)</span></code></pre></figure></div>
   <div class="exercise" data-exercise="hello"><figure class="code-listing"><pre><code><span class="l">print("hi")</span></code></pre></figure></div>
 </section>"""
-        self.fx.write_guide("listings.html", body)
+        self.fx.write_guide("listings.html", body, mode="review", extra=' data-pr="1" data-head-sha="' + "0" * 40 + '"')
         report = check.Report()
         check.check_guide(self.fx.onboard / "listings.html", self.fx.root, report, onboard_dir=self.fx.onboard)
         self.assertEqual(len(report.errors), 2, report.errors)
@@ -107,6 +107,26 @@ class DriftGateTest(unittest.TestCase):
         self.assertIn("exercise hello", report.errors[1])
         self.assertEqual(len(report.warnings), 1)
         self.assertIn("no data-src", report.warnings[0])
+
+    def test_overview_and_plan_rules(self):
+        from support import OVERVIEW
+        no_overview = DEFAULT_BODY.replace(OVERVIEW, "")
+        self.fx.write_guide("a.html", no_overview)
+        bad_plan = OVERVIEW.replace('data-importance="high"', 'data-importance="huge"') \
+            .replace("</tbody>", '<tr data-plan="ghost" data-importance="low" data-complexity="low" data-intensity="fast"><td>g</td></tr></tbody>') \
+            .replace("</section>", '<div data-q="oq" data-answer="a"><p class="prompt">p</p><ol><li data-choice="a">a</li><li data-choice="b">b</li></ol></div></section>')
+        self.fx.write_guide("b.html", DEFAULT_BODY.replace(OVERVIEW, bad_plan)
+                            + '<section class="module" data-module="m2"><h2>2</h2><p data-depth="extreme">x</p></section>')
+        errors = {}
+        for guide in ("a.html", "b.html"):
+            report = check.Report()
+            check.check_guide(self.fx.onboard / guide, self.fx.root, report, onboard_dir=self.fx.onboard)
+            errors[guide] = "\n".join(report.errors)
+        self.assertIn("must start with an overview module", errors["a.html"])
+        for expected in ("data-importance must be one of", "data-plan='ghost' is not a later module",
+                         "data-intensity must be one of", "must not contain questions",
+                         "no row for: m2", "data-depth must be one of"):
+            self.assertIn(expected, errors["b.html"])
 
     def test_review_guide_needs_sha(self):
         self.fx.write_guide("r.html", DEFAULT_BODY, mode="review")

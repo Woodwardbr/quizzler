@@ -73,14 +73,16 @@ class BrowserTest(unittest.TestCase):
         self.addCleanup(fx.cleanup)
         app = serve.GuideApp(fx.root, fx.onboard / "guide.html", onboard_dir=fx.onboard)
         self.serve(app)
-        self.assertEqual(self.js("return document.querySelectorAll('.qz-modules li').length"), 1)
+        self.assertEqual(self.js("return document.querySelectorAll('.qz-modules li').length"), 2)
+        self.js("document.querySelector('.qz-plan-actions .qz-primary').click()")  # start from the overview
+        self.wait("!document.getElementById('module-m1').hidden")
 
         self.answer("q1", "b", "sure")
         feedback = self.wait("document.querySelector('[data-q=q1] .qz-feedback').textContent")
         self.assertIn("Correct. Mastered", feedback)
         self.answer("q2", "b", "guess")
         self.assertIn("Gap", self.wait("document.querySelector('[data-q=q2] .qz-feedback').textContent"))
-        self.assertEqual(self.js("return document.querySelector('.qz-mod-status').textContent"), "2/2")
+        self.assertEqual(self.js("return document.querySelectorAll('.qz-mod-status')[1].textContent"), "2/2")
 
         # Exercise: a prediction is required before running.
         self.js("document.querySelector('.qz-exercise .qz-primary').click()")
@@ -122,6 +124,43 @@ class BrowserTest(unittest.TestCase):
         self.wait("document.documentElement.classList.contains('qz-ready')")
         self.assertTrue(self.wait("document.querySelector('[data-q=q1]').classList.contains('qz-answered')"))
 
+    def test_study_plan_intensity_and_skip(self):
+        fx = Fixture()
+        self.addCleanup(fx.cleanup)
+        from support import OVERVIEW
+        overview = OVERVIEW.replace("</tbody>", '<tr data-plan="m2" data-importance="low" data-complexity="high" data-intensity="skim"><td>Two</td><td>y</td></tr></tbody>')
+        body = overview + """
+<section class="module" data-module="m1"><h2>One</h2>
+  <p data-depth="standard" id="std">standard detail</p><p data-depth="deep" id="deep">deep detail</p>
+  <div data-q="q1" data-answer="a"><p class="prompt">P</p><ol class="choices"><li data-choice="a">a</li><li data-choice="b">b</li></ol></div>
+  <div data-q="q2" data-answer="a" data-depth="deep"><p class="prompt">P</p><ol class="choices"><li data-choice="a">a</li><li data-choice="b">b</li></ol></div>
+</section>
+<section class="module" data-module="m2"><h2>Two</h2>
+  <div data-q="q3" data-answer="a"><p class="prompt">P</p><ol class="choices"><li data-choice="a">a</li><li data-choice="b">b</li></ol></div>
+</section>"""
+        fx.write_guide("guide.html", body)
+        app = serve.GuideApp(fx.root, fx.onboard / "guide.html", onboard_dir=fx.onboard)
+        self.serve(app)
+        visible = "(id) => getComputedStyle(document.getElementById(id)).display !== 'none'"
+        js_visible = lambda i: self.js(f"document.getElementById('module-m1').hidden = false; return ({visible})(arguments[0])", i)
+        # Ratings and recommendations render; standard hides deep content and deep questions.
+        self.assertEqual(self.js("return [...document.querySelectorAll('[data-plan=m1] .qz-rating')].map(r => r.textContent)"), ["high", "low"])
+        self.assertTrue(js_visible("std"))
+        self.assertFalse(js_visible("deep"))
+        self.assertEqual(self.js("return document.querySelectorAll('.qz-mod-status')[1].textContent"), "0/1")
+        # Deep shows everything and counts the deep question.
+        self.js("const s = document.querySelector('[data-plan=m1] select'); s.value = 'deep'; s.dispatchEvent(new Event('change'))")
+        self.assertTrue(js_visible("deep"))
+        self.assertEqual(self.js("return document.querySelectorAll('.qz-mod-status')[1].textContent"), "0/2")
+        # Skip drops m2 from the pager and progress.
+        self.js("const s = document.querySelector('[data-plan=m2] select'); s.value = 'skip'; s.dispatchEvent(new Event('change'))")
+        self.assertEqual(self.js("return document.querySelectorAll('.qz-mod-status')[2].textContent"), "skipped")
+        self.js("document.querySelectorAll('.qz-modules a')[1].click()")
+        self.assertTrue(self.js("return document.querySelector('.qz-pager .qz-primary').disabled"))
+        self.js("[...document.querySelectorAll('.qz-btn')].find(b => b.textContent.startsWith('Export')).click()")
+        code = self.wait("document.querySelector('.qz-dialog textarea') && document.querySelector('.qz-dialog textarea').value")
+        self.assertEqual(json.loads(code.split(" ", 1)[1])["plan"], {"m1": "deep", "m2": "skip"})
+
     def test_code_pane_open_by_default_and_follows_scroll(self):
         fx = Fixture()
         self.addCleanup(fx.cleanup)
@@ -133,7 +172,7 @@ class BrowserTest(unittest.TestCase):
   <p id="later"><code data-src="src/app.py" data-sym="Service.run">run</code></p>
   {filler}
 </section>"""
-        fx.write_guide("guide.html", body)
+        fx.write_guide("guide.html", body, mode="review", extra=' data-pr="1" data-head-sha="' + "0" * 40 + '"')
         app = serve.GuideApp(fx.root, fx.onboard / "guide.html", onboard_dir=fx.onboard)
         self.serve(app)
         self.wait("!document.getElementById('qz-code').hidden")

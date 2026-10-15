@@ -24,7 +24,16 @@ GUIDE_TEMPLATE = """<!doctype html>
 </main></body></html>
 """
 
-DEFAULT_BODY = """
+OVERVIEW = """
+<section class="module" data-module="overview" data-overview data-title="Overview">
+  <h2>Overview</h2>
+  <table><thead><tr><th>Module</th><th>What</th></tr></thead><tbody>
+    <tr data-plan="m1" data-importance="high" data-complexity="low" data-intensity="standard"><td>Module one</td><td>x</td></tr>
+  </tbody></table>
+</section>
+"""
+
+DEFAULT_BODY = OVERVIEW + """
 <section class="module" data-module="m1" data-title="Module one">
   <h2>Module one</h2>
   <p><code data-src="src/app.py" data-ref="def handler(request):">handler</code>
