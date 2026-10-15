@@ -1518,7 +1518,7 @@
       code.label = target.label || target.sym || '';
       code.focus = target.focus || new Set();
       code.keys = target.keys || [];
-      await loadSource(target.path, { around: line });
+      await loadSource(target.path, { around: line }, seq);
       if (seq !== openSeq) return;
       const row = codeBody.querySelector(`[data-line="${line}"]`);
       if (row) {
@@ -1533,11 +1533,14 @@
     }
   }
 
-  async function loadSource(path, query) {
+  // `seq` (from openSource) lets a newer open or the repo map win if they
+  // happen while this fetch is in flight.
+  async function loadSource(path, query, seq) {
+    const data = await api('source', { path, base: changesState.base, ...query });
+    if (seq != null && seq !== openSeq) return;
     if (code.mode !== 'map-source') code.mode = 'source';
     codeTitle.classList.remove('qz-title-plain');
     mapBack.hidden = !(overview && mapKindFor(modules[state.current]));
-    const data = await api('source', { path, base: changesState.base, ...query });
     code.path = data.path;
     code.start = data.start; code.end = data.end; code.total = data.total;
     code.changed = new Set(data.changed || []);
@@ -1776,6 +1779,7 @@
 
   async function showRepoMap(opts = {}) {
     const kind = opts.kind || mapKindFor(modules[state.current]) || 'modules';
+    openSeq += 1;  // any source load still in flight is now stale and must not replace the map
     code.mode = 'map';
     code.mapKind = kind;
     code.path = null;
