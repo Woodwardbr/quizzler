@@ -65,13 +65,16 @@
     <table>
       <thead><tr><th>Path</th><th>What is there</th></tr></thead>
       <tbody>
-        <tr><td><code>.claude/commands/</code></td><td>The <code>/onboard</code> and <code>/review-pr</code> instructions for Claude.</td></tr>
-        <tr><td><code data-src="docs/onboarding/serve.py" data-sym="GuideApp">docs/onboarding/serve.py</code></td><td>The loopback server.</td></tr>
-        <tr><td><code data-src="docs/onboarding/guidelib.py" data-sym="PathPolicy">docs/onboarding/guidelib.py</code></td><td>Shared logic: path policy, anchors, guide parser, exercise runner, git diffs.</td></tr>
-        <tr><td><code data-src="docs/onboarding/app/guide.js" data-ref="Quizzler guide engine.">docs/onboarding/app/</code></td><td>The browser engine (<code>guide.js</code>, <code>guide.css</code>).</td></tr>
-        <tr><td><code>docs/onboarding/*.py</code></td><td>The CLI tools: <code>check</code>, <code>check_layout</code>, <code>review</code>, <code>progress</code>.</td></tr>
+        <tr data-area="docs/onboarding/"><td><code>docs/onboarding/</code></td><td>The guide engine: the server, the shared library and the CLI tools (<code>check</code>, <code>check_layout</code>, <code>review</code>, <code>progress</code>, <code>relay</code>).</td></tr>
+        <tr data-area="docs/onboarding/serve.py"><td><code data-src="docs/onboarding/serve.py" data-sym="GuideApp">serve.py</code></td><td>The loopback server.</td></tr>
+        <tr data-area="docs/onboarding/guidelib.py"><td><code data-src="docs/onboarding/guidelib.py" data-sym="PathPolicy">guidelib.py</code></td><td>Shared logic: path policy, anchors, guide parser, exercise runner, git diffs, request queue.</td></tr>
+        <tr data-area="docs/onboarding/app/"><td><code data-src="docs/onboarding/app/guide.js" data-ref="Quizzler guide engine.">app/</code></td><td>The browser engine (<code>guide.js</code>, <code>guide.css</code>) and the layout probe.</td></tr>
+        <tr data-area="docs/onboarding/exercises/"><td><code>exercises/</code> · <code>expected/</code></td><td>Shared exercises and their recorded output, checked in CI.</td></tr>
+        <tr data-area="docs/onboarding/examples/"><td><code>examples/</code></td><td>A maintained review-mode guide used as an authoring reference.</td></tr>
+        <tr data-area="tests/"><td><code>tests/</code></td><td>Unit, server, review, relay and browser tests.</td></tr>
+        <tr data-area="plans/"><td><code>plans/</code></td><td>The original design plan.</td></tr>
+        <tr><td><code>.claude/commands/</code></td><td>The <code>/onboard</code> and <code>/review-pr</code> instructions for Claude (hidden folders aren't shown in the map).</td></tr>
         <tr><td><code>docs/onboarding/local/</code></td><td>Your personal state. Git ignores it.</td></tr>
-        <tr><td><code>tests/</code></td><td>Unit, server, review and browser tests.</td></tr>
       </tbody>
     </table>
     </div>

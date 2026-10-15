@@ -163,6 +163,17 @@ The steps:
 4. The session writes the content, runs `relay.py done <ids>`, and starts waiting again.
 5. The page reloads **once, when the request is done**, so it never shows a half-written guide. If you're typing, it offers a reload button instead.
 
+### Repository map (overview)
+
+While the reader is on the overview, the source pane shows a **repository map** instead of code: a folder tree of the repo, built from the files the path policy allows, with file counts.
+
+- **Descriptions:** come from overview elements with `data-area="path/"`, usually rows of the "where things live" table. A folder's description is the row's other cells, or `data-area-desc`. Described folders are highlighted and expanded.
+- **Linked to the table:** hovering or clicking an area row highlights its folder in the map, and clicking a described folder flashes its row.
+- **Opening files:** clicking a file opens it in the pane, with a "← Repository map" button to go back.
+- **Leaving the overview:** the pane goes back to following code.
+
+`check.py` requires that `data-area` paths exist, are visible, and appear only in the overview.
+
 ### Writing style
 
 Guides are read by skimming, and the code pane follows the reader, so:

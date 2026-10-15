@@ -169,6 +169,19 @@ class DriftGateTest(unittest.TestCase):
                          "data-intensity must be one of"):
             self.assertIn(expected, errors["bad.html"])
 
+    def test_area_rules(self):
+        from support import OVERVIEW
+        body = OVERVIEW.replace("</section>", '<p data-area="src/">ok</p><p data-area="nope/">x</p><p data-area=".git/">x</p></section>') + \
+            '<section class="module" data-module="m1"><h2>1</h2><p data-area="src/">x</p></section>'
+        self.fx.write_guide("a.html", body)
+        report = check.Report()
+        check.check_guide(self.fx.onboard / "a.html", self.fx.root, report, onboard_dir=self.fx.onboard)
+        errors = "\n".join(report.errors)
+        self.assertIn("'nope/' does not exist", errors)
+        self.assertIn("'.git/' must be a visible repository path", errors)
+        self.assertIn("data-area belongs in the overview", errors)
+        self.assertEqual(len(report.errors), 3)
+
     def test_review_guide_needs_sha(self):
         self.fx.write_guide("r.html", DEFAULT_BODY, mode="review")
         report = check.Report()

@@ -109,6 +109,16 @@ def check_guide(guide_path: Path, repo_root: Path, report: Report, *,
         dupes = sorted({m for m in planned if planned.count(m) > 1})
         if dupes:
             report.error(name, f"overview plan lists modules twice: {', '.join(dupes)}")
+    for area, line, module in guide.areas:
+        where = f"{name}:{line}"
+        if module != guide.overview:
+            report.error(where, "data-area belongs in the overview (it labels folders in the repository map)")
+        rel = area.rstrip("/")
+        parts = rel.split("/") if rel else []
+        if not parts or any(p in ("", ".", "..") or p.startswith(".") or gl.is_secret_name(p) for p in parts):
+            report.error(where, f"data-area={area!r} must be a visible repository path")
+        elif not (repo_root / rel).exists():
+            report.error(where, f"data-area={area!r} does not exist in the repository")
     for label, section in (("final review", guide.final), ("summary", guide.summary)):
         if section is None:
             continue
