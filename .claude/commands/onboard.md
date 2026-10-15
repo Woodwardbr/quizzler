@@ -70,12 +70,29 @@ The last entry in an onboarding guide is the final review. Until you write one, 
 ### `final-review`
 
 1. Run `progress.py ingest`, then `progress.py report`. The report includes an "Across rounds" history from round 2 onwards.
-2. Append (or replace) the last section: `<section class="module" data-module="final-review" data-final data-title="Final review">`. It has no questions or exercises, and contains:
-   - **Key points:** an honest one-paragraph verdict for this round.
-   - **What you've got:** bullets per module, naming the concepts behind mastered answers, with anchors to the code.
-   - **What you missed:** bullets per module for misconceptions first, then gaps, then fragile answers, then unanswered questions and missed exercise predictions. Say what the right model is in one line, and anchor it.
-   - **From round 2 on:** what improved and what is still shaky, using the "Across rounds" history.
-   - **A refresh plan table:** header `<th>Module</th><th>Why revisit</th>`, with one `<tr data-refresh="<module>" data-intensity="skip|skim|standard|deep">` row per study module. Recommend `skip` for mastered modules and `deep` for modules with misconceptions. The engine adds the dropdowns and the two end-of-round buttons.
+2. Append (or replace) the last section: `<section class="module" data-module="final-review" data-final data-title="Final review">`. It has no questions or exercises.
+
+   The engine turns each `<h3>` into a boxed card coloured by the h3's class: `got` green, `missed` red, `shaky` amber, `plan` blue. It also inserts a colour-coded "Question by question" card (every question, your answer against the correct one) right after the verdict. So don't repeat raw scores; explain them.
+
+   Use exactly this structure, in this order, leaving out a card that would be empty:
+
+   ```html
+   <div class="key-points"><h3>Verdict</h3><ul><li>…2–3 honest bullets…</li></ul></div>
+   <h3 class="got">What you've got</h3>
+     <h4>Module title</h4>
+     <ul><li class="got">Concept, with an <code data-src=… data-sym=…>anchor</code></li></ul>
+   <h3 class="missed">What you missed</h3>
+     <h4>Module title</h4>
+     <ul><li class="missed">What you thought, in one line.
+           <span class="right-idea">the correct model in one line, anchored</span></li></ul>
+   <h3 class="shaky">Still shaky</h3>      <!-- fragile answers; from round 2, also "improved" items as li.got -->
+   <h3 class="plan">Refresh plan</h3>
+     <table>…</table>
+   ```
+
+   - **What you missed:** misconceptions first, then gaps, then unanswered questions and missed exercise predictions.
+   - **From round 2 on:** use the "Across rounds" history inside these cards. For example, mark "was a gap, now mastered" as `li.got`, and anything that stayed wrong as `li.missed`.
+   - **Refresh plan table:** header `<th>Module</th><th>Why revisit</th>`, with one `<tr data-refresh="<module>" data-intensity="skip|skim|standard|deep">` row per study module. Recommend `skip` for mastered modules and `deep` for modules with misconceptions. The engine adds the dropdowns and the two end-of-round buttons.
 3. Validate the guide, then run `relay.py done`.
 
 ### `new-round` (go back over what I missed)
@@ -92,6 +109,7 @@ The last entry in an onboarding guide is the final review. Until you write one, 
 1. Run `progress.py ingest` and `progress.py report`.
 2. Append `<section class="module" data-module="summary" data-summary data-title="Your final report">` after the final review. It is a report on **how well the reader knows each part of the codebase**:
    - **Key points:** an overall verdict in 2–3 bullets.
+   - Use the same coloured `<h3>` cards as the final review: `<h3 class="got">You can now…</h3>`, `<h3 class="shaky">Look at later</h3>` and `<h3 class="plan">Mastery by area</h3>`, with `li.got`, `li.shaky` and `li.missed` items.
    - **A mastery table, one row per part of the codebase** (module, with its main directories and files anchored):
      - a rating: **solid**, **working knowledge**, **shaky** or **not covered**, based on classifications across all rounds;
      - the concepts behind it;

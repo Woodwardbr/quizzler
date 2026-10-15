@@ -609,3 +609,66 @@ section.qz-generating > :not(.qz-work):not(h2):not(.qz-eyebrow) { animation: qz-
 .qz-area:hover, .qz-area-flash { background: var(--hl); }
 .qz-code-head-actions { margin: 0; flex-wrap: nowrap; }
 .qz-code-title.qz-title-plain { font-family: var(--sans); font-size: 1.05rem; }
+
+/* Final review and report: boxed, colour-coded sections */
+.qz-review-card {
+  --tone: var(--border); --tone-soft: var(--surface-2);
+  border: 1px solid var(--tone); border-radius: var(--radius); background: var(--surface);
+  margin: 1.25rem 0; overflow: hidden;
+}
+.qz-review-card > :not(.qz-review-card-head) { margin-left: 1.1rem; margin-right: 1.1rem; }
+.qz-review-card > :last-child { margin-bottom: 1rem; }
+.qz-review-card-head {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap;
+  background: var(--tone-soft); border-bottom: 1px solid var(--tone); padding: 0.6rem 1.1rem; margin-bottom: 0.75rem;
+}
+.qz-review-card-head h3 { margin: 0 !important; padding: 0 !important; border: 0 !important; font-size: 1.05rem; }
+.qz-review-card-head a { font-weight: 650; }
+.qz-tone-got { --tone: var(--ok); --tone-soft: var(--ok-soft); }
+.qz-tone-missed { --tone: var(--bad); --tone-soft: var(--bad-soft); }
+.qz-tone-shaky { --tone: var(--warn); --tone-soft: var(--warn-soft); }
+.qz-tone-plan { --tone: var(--accent); --tone-soft: var(--accent-soft); }
+.qz-tone-got .qz-review-card-head h3::before { content: "✓ "; color: var(--ok); }
+.qz-tone-missed .qz-review-card-head h3::before { content: "✗ "; color: var(--bad); }
+.qz-tone-shaky .qz-review-card-head h3::before { content: "~ "; color: var(--warn); }
+.qz-review-card h4 { margin: 1rem 0 0.4rem; font-size: 0.95rem; }
+
+/* List items Claude marks got / missed / shaky */
+main[data-guide] li.got, main[data-guide] li.missed, main[data-guide] li.shaky {
+  list-style: none; position: relative; padding: 0.45rem 0.75rem 0.45rem 2.2rem; margin: 0.4rem 0;
+  border-radius: 6px; border-left: 4px solid;
+}
+main[data-guide] li.got { background: var(--ok-soft); border-color: var(--ok); }
+main[data-guide] li.missed { background: var(--bad-soft); border-color: var(--bad); }
+main[data-guide] li.shaky { background: var(--warn-soft); border-color: var(--warn); }
+main[data-guide] li.got::before, main[data-guide] li.missed::before, main[data-guide] li.shaky::before {
+  position: absolute; left: 0.75rem; font-weight: 700;
+}
+main[data-guide] li.got::before { content: "✓"; color: var(--ok); }
+main[data-guide] li.missed::before { content: "✗"; color: var(--bad); }
+main[data-guide] li.shaky::before { content: "~"; color: var(--warn); }
+.qz-right-idea { display: block; margin-top: 0.3rem; font-size: 0.92em; }
+.qz-right-idea::before, .right-idea::before { content: "Right idea: "; font-weight: 650; }
+.right-idea { display: block; margin-top: 0.3rem; font-size: 0.92em; }
+
+/* Question-by-question results */
+.qz-breakdown .qz-review-card { margin: 0.75rem 0; }
+.qz-results { list-style: none; padding: 0; margin: 0 0 0.25rem; display: grid; gap: 0.4rem; }
+.qz-result {
+  display: grid; grid-template-columns: 1.6rem minmax(0, 1fr); gap: 0.5rem; align-items: start;
+  padding: 0.5rem 0.75rem; border-radius: 6px; border-left: 4px solid var(--border); background: var(--surface-2);
+}
+.qz-result-icon { font-weight: 800; text-align: center; }
+.qz-result-prompt { font-weight: 600; }
+.qz-result-detail { font-size: 0.88rem; color: var(--muted); }
+.qz-result-label { font-weight: 700; }
+.qz-result-got { background: var(--ok-soft); border-color: var(--ok); }
+.qz-result-got .qz-result-icon, .qz-result-got .qz-result-label { color: var(--ok); }
+.qz-result-shaky { background: var(--warn-soft); border-color: var(--warn); }
+.qz-result-shaky .qz-result-icon, .qz-result-shaky .qz-result-label { color: var(--warn); }
+.qz-result-missed { background: var(--bad-soft); border-color: var(--bad); }
+.qz-result-missed .qz-result-icon, .qz-result-missed .qz-result-label { color: var(--bad); }
+.qz-generate-review { text-align: left; }
+.qz-generate-review .qz-btn-big { display: block; margin: 0 auto 0.75rem; }
+.qz-next-steps { margin: 0; padding-left: 1.3rem; }
+.qz-next-steps li { margin: 0.3rem 0; }
