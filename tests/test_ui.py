@@ -358,6 +358,33 @@ class BrowserTest(unittest.TestCase):
         self.js("document.querySelectorAll('.qz-modules a')[1].click()")
         self.wait("document.querySelector('.qz-code-title').textContent === 'src/app.py'")
 
+    def test_light_dark_switch(self):
+        fx = Fixture()
+        self.addCleanup(fx.cleanup)
+        app = serve.GuideApp(fx.root, fx.onboard / "guide.html", onboard_dir=fx.onboard)
+        self.serve(app)
+        bg = "return getComputedStyle(document.body).backgroundColor"
+        button = "document.querySelector('.qz-top-actions .qz-theme-toggle')"
+        self.assertTrue(self.js(f"return {button} === document.querySelector('.qz-top-actions').lastElementChild"))
+        start = self.js("return document.documentElement.dataset.theme || 'system'")
+        first_bg = self.js(bg)
+        self.js(f"{button}.click()")
+        theme = self.js("return document.documentElement.dataset.theme")
+        self.assertIn(theme, ("light", "dark"))
+        self.assertNotEqual(self.js(bg), first_bg)
+        self.js(f"{button}.click()")
+        other = self.js("return document.documentElement.dataset.theme")
+        self.assertNotEqual(other, theme)
+        # The choice is saved with progress and survives a reload on a new port.
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline and not (app.results_path.exists() and other in app.results_path.read_text()):
+            time.sleep(0.1)
+        self.assertEqual(json.loads(app.results_path.read_text())["prefs"], {"theme": other})
+        self.js("localStorage.clear()")
+        self.browser._cmd("WebDriver:Navigate", {"url": app.url})
+        self.wait("document.documentElement.classList.contains('qz-ready')")
+        self.assertEqual(self.js("return document.documentElement.dataset.theme"), other)
+
     def test_code_pane_open_by_default_and_follows_scroll(self):
         fx = Fixture()
         self.addCleanup(fx.cleanup)
