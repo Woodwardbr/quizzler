@@ -302,7 +302,7 @@ class Handler(BaseHTTPRequestHandler):
         symbol = gl.lookup_symbol(self._symbols(rel), q.get("name", ""))
         if symbol is None:
             raise HTTPError(HTTPStatus.NOT_FOUND, f"symbol not found: {q.get('name')}")
-        return {"path": rel, "line": symbol["line"], "end_line": symbol["line"], **symbol}
+        return {"path": rel, **symbol, "end_line": symbol.get("end_line", symbol["line"])}
 
     def _exercise_path(self, name) -> Path:
         path = self.app.exercises.get(name)
@@ -312,7 +312,9 @@ class Handler(BaseHTTPRequestHandler):
 
     def _exercise_info(self, q):
         name = q.get("name", "")
-        return {"name": name, "predict": gl.exercise_predict(self._exercise_path(name))}
+        path = self._exercise_path(name)
+        return {"name": name, "file": path.name, "predict": gl.exercise_predict(path),
+                **gl.exercise_listing(path)}
 
     def _load_results(self):
         path = self.app.results_path

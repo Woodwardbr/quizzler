@@ -141,6 +141,34 @@ def check_guide(guide_path: Path, repo_root: Path, report: Report, *,
             report.warn(where, f"finding {finding.id} has no .comment-draft")
 
     dirs = gl.guide_exercise_dirs(guide_path, onboard_dir)
+    for listing in guide.listings:
+        where = f"{name}:{listing.line}"
+        if listing.path:
+            text = source(listing.path, where)
+            if text is None:
+                continue
+            lines = text.split("\n")
+            if listing.lines:
+                try:
+                    start, end = gl.parse_line_range(listing.lines)
+                except ValueError as exc:
+                    report.error(where, str(exc))
+                    continue
+                lines = lines[start - 1:end]
+            label = listing.path
+        elif listing.exercise:
+            path = gl.resolve_exercise(listing.exercise, dirs)
+            if path is None:
+                continue  # reported below as a missing exercise
+            lines = gl.read_text(path).split("\n")
+            label = f"exercise {listing.exercise}"
+        else:
+            report.warn(where, "code listing has no data-src; it is not checked against the source and can drift")
+            continue
+        problem = gl.listing_drift(listing.code, lines)
+        if problem:
+            report.error(where, f"{label}: {problem}")
+
     for exercise in guide.exercises:
         if not gl.EXERCISE_NAME_RE.match(exercise):
             report.error(name, f"exercise name {exercise!r} is not [a-z0-9_]")

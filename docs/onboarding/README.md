@@ -106,6 +106,16 @@ A guide is an HTML file somewhere under `docs/onboarding/`. Its asset links are 
 </main>
 ```
 
+### Writing style
+
+Guides are read by skimming, and the code pane follows the reader, so:
+
+- Open each module with `<div class="key-points">` containing 2–4 bullets.
+- Prefer bullets and numbered steps to paragraphs. Give every flow an SVG diagram. Use short `<h3>` sub-sections.
+- Show multi-line code as `<figure class="code-listing" data-src="path" data-lines="A-B"><pre>…</pre></figure>`. `check.py` verifies that every line shown still exists in that range, in order. A line of `...` marks a gap. Exercise code is shown from the exercise file automatically; `# --- exercise ---` hides the setup above it.
+- Use `<p class="note">` and `<div class="warning">` for short asides.
+- On wide screens the source pane is open by default and follows the anchor nearest the top of the screen. The anchor it is showing is outlined. Close pauses following, and clicking any anchor resumes it.
+
 Diagram classes are `box`, `box-accent`, `box-warn`, `edge`, `arrowhead`, `text.title` and `text.small`. They follow the theme. Wrap wide tables in `<div class="table-wrap">`. Wrap the SVG in `.diagram-scroll` so phones scroll the diagram sideways instead of shrinking its labels.
 
 Answers live in the page source (`data-answer`). The guides are for learning, not for exams.

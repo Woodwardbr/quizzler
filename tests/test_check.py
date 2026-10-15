@@ -85,6 +85,29 @@ class DriftGateTest(unittest.TestCase):
         errors = "\n".join(self.run_check("examples/nested.html").errors)
         self.assertIn("does not point at docs/onboarding/app/", errors)
 
+    def test_listings_are_checked_against_source(self):
+        body = """
+<section class="module" data-module="m1"><h2>x</h2>
+  <figure class="code-listing" data-src="src/app.py" data-lines="4-5"><pre>def handler(request):
+    return request</pre></figure>
+  <figure class="code-listing" data-src="src/app.py" data-lines="4-5"><pre>def handler(request):
+    return request.upper()</pre></figure>
+  <figure class="code-listing" data-src="src/app.py"><pre>class Service:
+    ...
+        return "ok"</pre></figure>
+  <figure class="code-listing"><pre>anything</pre></figure>
+  <div class="exercise" data-exercise="hello"><figure class="code-listing"><pre><code><span class="l">print("hello", 6 * 7)</span></code></pre></figure></div>
+  <div class="exercise" data-exercise="hello"><figure class="code-listing"><pre><code><span class="l">print("hi")</span></code></pre></figure></div>
+</section>"""
+        self.fx.write_guide("listings.html", body)
+        report = check.Report()
+        check.check_guide(self.fx.onboard / "listings.html", self.fx.root, report, onboard_dir=self.fx.onboard)
+        self.assertEqual(len(report.errors), 2, report.errors)
+        self.assertIn("'return request.upper()'", report.errors[0])
+        self.assertIn("exercise hello", report.errors[1])
+        self.assertEqual(len(report.warnings), 1)
+        self.assertIn("no data-src", report.warnings[0])
+
     def test_review_guide_needs_sha(self):
         self.fx.write_guide("r.html", DEFAULT_BODY, mode="review")
         report = check.Report()

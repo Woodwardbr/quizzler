@@ -16,7 +16,15 @@
 
   <section class="module" data-module="map" data-title="One engine, two entry points">
     <h2>One engine, two entry points</h2>
-    <p><code>/onboard</code> teaches a repository. <code>/review-pr &lt;N&gt;</code> teaches a pull request and collects your review. Both commands produce the same kind of file: a static HTML guide that loads <code data-src="docs/onboarding/app/guide.js" data-ref="Quizzler guide engine.">app/guide.js</code> and <code>app/guide.css</code>. A tiny local server, <code data-src="docs/onboarding/serve.py" data-sym="GuideApp">GuideApp</code>, serves the guide and gives the browser read-only access to source.</p>
+    <div class="key-points">
+      <h3>Key points</h3>
+      <ul>
+        <li><code>/onboard</code> teaches a repository. <code>/review-pr &lt;N&gt;</code> teaches a pull request and collects your review.</li>
+        <li>Both produce the same thing: a static HTML guide that loads <code data-src="docs/onboarding/app/guide.js" data-ref="Quizzler guide engine.">app/guide.js</code> and <code>app/guide.css</code>.</li>
+        <li>A small local server, <code data-src="docs/onboarding/serve.py" data-sym="GuideApp">GuideApp</code>, serves the guide and gives the browser read-only access to source.</li>
+      </ul>
+    </div>
+    <p class="note">Highlighted code like <code data-src="docs/onboarding/serve.py" data-sym="GuideApp">GuideApp</code> is a link: the code pane on the right shows it, and follows along as you scroll.</p>
 
     <figure class="diagram">
       <div class="diagram-scroll">
@@ -89,13 +97,38 @@
 
   <section class="module" data-module="server" data-title="The server's security boundary">
     <h2>The server's security boundary</h2>
-    <p>The server is deliberately small and uses only the standard library. Its defences are layered:</p>
+    <div class="key-points">
+      <h3>Key points</h3>
+      <ul>
+        <li>The server is small and uses only the standard library.</li>
+        <li>Four layers stand between a web page and your files. Each one is listed below.</li>
+      </ul>
+    </div>
+    <h3>The four layers</h3>
     <ol>
       <li><strong>Loopback only.</strong> It binds to <code data-src="docs/onboarding/serve.py" data-ref='HOST = "127.0.0.1"'>127.0.0.1</code>, and <code data-src="docs/onboarding/serve.py" data-sym="Handler._host_ok">_host_ok</code> rejects any other <code>Host</code> header, which blocks DNS-rebinding tricks.</li>
       <li><strong>Per-run token.</strong> Each process picks <code data-src="docs/onboarding/serve.py" data-ref="self.token = token or secrets.token_urlsafe(32)">a fresh random token</code>. Every route except <code>/healthz</code> lives under <code>/t/&lt;token&gt;/</code>, and the token is compared in <code data-src="docs/onboarding/serve.py" data-ref="hmac.compare_digest(token.encode(), self.app.token.encode())">constant time</code>.</li>
       <li><strong>Path policy.</strong> <code data-src="docs/onboarding/guidelib.py" data-sym="PathPolicy">PathPolicy</code> refuses traversal, hidden components, secret-looking names such as <code data-src="docs/onboarding/guidelib.py" data-ref='"env.storage.*", "env.storage"'>env.storage.*</code>, the guide's own <code>local/</code> state, and non-source file types. After resolving symlinks it <code data-src="docs/onboarding/guidelib.py" data-ref="if not resolved.is_relative_to(self.root):">checks the real path again</code>.</li>
       <li><strong>Registered exercises only.</strong> The browser sends only an exercise name. Names that the active guide does not register get <code data-src="docs/onboarding/serve.py" data-ref='"exercise is not registered for this guide"'>a 404</code>. Registered exercises run in <code data-src="docs/onboarding/guidelib.py" data-sym="run_exercise">a constrained subprocess</code>.</li>
     </ol>
+
+    <h3>The token check, in full</h3>
+    <p>Every request goes through <code>_route</code> first:</p>
+    <figure class="code-listing" data-src="docs/onboarding/serve.py" data-lines="169-178"><pre>    def _route(self):
+        """Return (rest_of_path, query) for token-scoped routes, or None."""
+        parts = urlsplit(self.path)
+        raw = parts.path
+        if not raw.startswith("/t/"):
+            return None
+        token, sep, rest = raw[3:].partition("/")
+        if not sep or not hmac.compare_digest(token.encode(), self.app.token.encode()):
+            return None
+        return unquote(rest), parse_qs(parts.query, max_num_fields=20)</pre></figure>
+    <ul>
+      <li>No <code>/t/</code> prefix: <code>None</code>, which becomes a 404.</li>
+      <li>Wrong token: also <code>None</code>. A wrong token looks exactly like a missing page.</li>
+      <li>Right token: the rest of the path is routed.</li>
+    </ul>
 
     <div class="exercise" data-exercise="path_policy"></div>
 
@@ -132,7 +165,14 @@
 
   <section class="module" data-module="contract" data-title="Guides that cannot silently rot">
     <h2>Guides that cannot silently rot</h2>
-    <p>Every claim a guide makes about the code points at the source through data attributes:</p>
+    <div class="key-points">
+      <h3>Key points</h3>
+      <ul>
+        <li>Every claim about code is anchored to the source with a data attribute.</li>
+        <li>CI re-checks every anchor, listing and exercise output on every push.</li>
+      </ul>
+    </div>
+    <h3>The anchors</h3>
     <div class="table-wrap">
     <table>
       <thead><tr><th>Attribute</th><th>Meaning</th><th>Checked by</th></tr></thead>
@@ -144,7 +184,14 @@
       </tbody>
     </table>
     </div>
-    <p>CI runs <code>check.py</code>. If code moves and a literal no longer matches, or an exercise prints something different from <code>expected/</code>, the build fails until the guide or the recording is updated on purpose.</p>
+    <h3>What fails the build</h3>
+    <ol>
+      <li>A literal anchor no longer matches, or matches more than once.</li>
+      <li>A symbol was renamed or deleted.</li>
+      <li>A code listing shows a line that is not in the file any more.</li>
+      <li>An exercise prints something different from <code>expected/</code>.</li>
+    </ol>
+    <p>Each one stays failing until the guide or the recording is updated on purpose.</p>
 
     <div class="question" data-q="contract-ambiguous" data-answer="b">
       <p class="prompt">A guide anchors on <code>return None</code>, which appears three times in the file, and sets no <code>data-occurrence</code>. What does <code>check.py</code> do?</p>
@@ -169,7 +216,20 @@
 
   <section class="module" data-module="loop" data-title="The adaptive loop and PR review">
     <h2>The adaptive loop and PR review</h2>
-    <p>When you finish a module, your answers come back to Claude in one of two ways: the server saves them under <code>local/</code>, or you paste the <code>QUIZZLER-ONBOARD</code> result code. <code data-src="docs/onboarding/guidelib.py" data-sym="classify">classify</code> sorts each answer into one of four groups:</p>
+    <div class="key-points">
+      <h3>Key points</h3>
+      <ul>
+        <li>Your answers and confidence ratings decide what the next guide version teaches.</li>
+        <li>Review mode follows the same loop, one module of the PR at a time, and never posts on its own.</li>
+      </ul>
+    </div>
+    <h3>One turn of the loop</h3>
+    <ol>
+      <li>You answer a module's questions. The server saves them under <code>local/</code>, or you paste the <code>QUIZZLER-ONBOARD</code> result code.</li>
+      <li><code data-src="docs/onboarding/guidelib.py" data-sym="classify">classify</code> sorts each answer into one of four groups (table below).</li>
+      <li><code data-src="docs/onboarding/progress.py" data-sym="bump">progress.py bump</code> archives the guide, increments <code>data-version</code>, and marks mastered questions <code data-src="docs/onboarding/progress.py" data-ref='retired.setdefault(qid, f"v{version}:mastered")'>data-retired</code>.</li>
+      <li>Claude rewrites the weak spots from <code>progress.py report</code>.</li>
+    </ol>
     <div class="table-wrap">
     <table>
       <thead><tr><th></th><th>Sure</th><th>Unsure or guessing</th></tr></thead>
@@ -179,8 +239,12 @@
       </tbody>
     </table>
     </div>
-    <p><code data-src="docs/onboarding/progress.py" data-sym="bump">progress.py bump</code> archives the current guide, increments <code>data-version</code>, and marks mastered questions with <code data-src="docs/onboarding/progress.py" data-ref='retired.setdefault(qid, f"v{version}:mastered")'>data-retired</code>. The text of the next version is written by Claude from <code>progress.py report</code>.</p>
-    <p>Review mode follows the same loop, one module of the PR at a time. Proposed findings stay locked until you have answered that module's questions, so you form your own view first. <code data-src="docs/onboarding/review.py" data-sym="preview">review.py preview</code> then binds every comment marked ready to the reviewed head SHA. <code data-src="docs/onboarding/review.py" data-ref="Posting comments is deliberately not implemented">Posting is not part of the tool</code>.</p>
+    <h3>In review mode</h3>
+    <ul>
+      <li>Proposed findings stay locked until you answer the module's questions, so you form your own view first.</li>
+      <li><code data-src="docs/onboarding/review.py" data-sym="preview">review.py preview</code> binds every comment marked ready to the reviewed head SHA.</li>
+      <li><code data-src="docs/onboarding/review.py" data-ref="Posting comments is deliberately not implemented">Posting is not part of the tool.</code> It needs your separate, explicit instruction.</li>
+    </ul>
 
     <div class="exercise" data-exercise="classify_answers"></div>
 

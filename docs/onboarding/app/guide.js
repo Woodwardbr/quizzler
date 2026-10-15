@@ -228,6 +228,7 @@
       section.id = section.id || `module-${section.dataset.module}`;
       section.setAttribute('tabindex', '-1');
       const heading = section.querySelector('h2');
+      if (heading) heading.before(el('p', { class: 'qz-eyebrow', text: `Module ${index + 1} of ${modules.length}` }));
       const label = section.dataset.title || (heading ? heading.textContent : section.dataset.module);
       const link = el('a', {
         href: `#${section.id}`, 'data-index': index,
@@ -268,6 +269,8 @@
       window.scrollTo({ top: 0 });
     }
     shell.classList.remove('qz-side-open');
+    lastAuto = null;
+    queueFollow();
     scheduleSave();
   }
 
@@ -281,6 +284,7 @@
     const id = question.dataset.q;
     const answer = question.dataset.answer;
     question.classList.add('qz-question');
+    question.prepend(el('p', { class: 'qz-eyebrow', text: 'Check your understanding' }));
     if (question.dataset.retired) {
       const note = el('p', { class: 'qz-retired-note' }, `Retired (${question.dataset.retired}). You already showed you know this.`);
       const details = el('details', { class: 'qz-retired' }, el('summary', { text: 'Show retired question' }));
@@ -372,22 +376,58 @@
   }
 
   // ------------------------------------------------------------ exercises
+  // The PREDICT: docstring is prose; show it as a callout and break numbered
+  // items "(1) ... (2) ..." onto their own lines.
+  function renderPredict(node, text) {
+    const clean = (text || 'Predict what this exercise prints.').replace(/^\s*PREDICT:\s*/, '').replace(/\s+/g, ' ').trim();
+    const parts = clean.split(/\s*\((\d+)\)\s*/);
+    node.replaceChildren();
+    if (parts.length < 3) { node.textContent = clean; return; }
+    if (parts[0]) node.append(el('p', {}, parts[0]));
+    const list = el('ol', { class: 'qz-predict-list' });
+    for (let i = 1; i < parts.length; i += 2) list.append(el('li', {}, parts[i + 1]));
+    node.append(list);
+  }
+
   function buildExercise(box) {
     const name = box.dataset.exercise;
     const record = () => (state.exercises[name] ||= { prediction: '', ran: false, matched: null });
-    const predictText = el('p', { class: 'qz-predict' }, hasServer ? 'Loading the exercise…' : 'Exercises run through the local guide server (serve.py).');
+    const predictText = el('div', { class: 'qz-predict' }, hasServer ? 'Loading the exercise…' : 'Exercises run through the local guide server (serve.py).');
     const prediction = el('textarea', { rows: '4', class: 'qz-prediction', 'aria-label': `Your predicted output for ${name}`, placeholder: 'Write the output you expect before running it.' });
     const run = el('button', { class: 'qz-btn qz-primary', type: 'button', disabled: !hasServer }, 'Run exercise');
     const status = el('p', { class: 'qz-feedback', role: 'status', 'aria-live': 'polite' });
     const output = el('pre', { class: 'qz-output', hidden: true });
     box.classList.add('qz-exercise');
-    box.prepend(el('h3', { class: 'qz-ex-title' }, 'Exercise: ', el('code', { text: name })));
-    box.append(predictText, prediction, el('div', { class: 'qz-row' }, run, status), output);
+    // Step 1 is the exercise's own code. A hand-written .code-listing inside
+    // the box is kept (check.py verifies it against the file); otherwise the
+    // code comes straight from the exercise file, so it cannot drift.
+    const authored = box.querySelector('.code-listing');
+    const listingSlot = authored || el('figure', { class: 'code-listing' },
+      el('figcaption', {}, el('span', { text: `${name}.py` }), el('span', { class: 'tag', text: 'Python · highlighted lines print' })),
+      el('pre', {}, el('code', { text: hasServer ? 'Loading…' : 'The code is shown when the guide runs through serve.py.' })));
+    const intro = [...box.childNodes].filter((n) => n !== authored);
+    box.replaceChildren(
+      el('div', { class: 'qz-ex-head' }, el('span', { class: 'qz-eyebrow', text: 'Exercise' }), el('h3', { class: 'qz-ex-title' }, el('code', { text: name }))),
+      ...intro,
+      el('h4', { class: 'qz-step' }, el('span', { class: 'qz-step-n' }, '1'), 'Read the code'), listingSlot,
+      el('h4', { class: 'qz-step' }, el('span', { class: 'qz-step-n' }, '2'), 'Predict the output'),
+      predictText, prediction,
+      el('h4', { class: 'qz-step' }, el('span', { class: 'qz-step-n' }, '3'), 'Run it and compare'),
+      el('div', { class: 'qz-row' }, run, status), output);
+    if (authored) enhanceListing(authored);
     prediction.value = (state.exercises[name] || {}).prediction || '';
     prediction.addEventListener('input', () => { record().prediction = prediction.value; scheduleSave(); });
     if (hasServer) {
       api('exercise', { name }).then((data) => {
-        predictText.textContent = data.predict || 'Predict what this exercise prints.';
+        renderPredict(predictText, data.predict);
+        if (!authored) {
+          const prints = new Set(data.prints || []);
+          const code = el('code', {}, data.lines.map((text, i) => el('span', {
+            class: prints.has(data.first_line + i) ? 'l out' : 'l', 'data-n': data.first_line + i,
+          }, text || ' ')));
+          listingSlot.querySelector('pre').replaceChildren(code);
+          listingSlot.classList.add('qz-numbered-from');
+        }
       }).catch((error) => { predictText.textContent = error.message; run.disabled = true; });
     }
     run.addEventListener('click', async () => {
@@ -501,24 +541,82 @@
   // ------------------------------------------------------------- anchors
   function buildAnchors() {
     guideRoot.querySelectorAll('[data-src]').forEach((node) => {
-      if (node.matches('[data-finding], .exercise')) return;
+      if (node.matches('[data-finding], .exercise, figure')) return;
       node.classList.add('qz-ref');
+      if (node.tagName === 'CODE') node.classList.add('qz-ref-code');
       if (node.tagName !== 'A' && node.tagName !== 'BUTTON') {
         node.setAttribute('role', 'button');
         node.setAttribute('tabindex', '0');
       } else if (node.tagName === 'A') {
         node.setAttribute('href', '#');
       }
-      node.title = node.dataset.sym ? `${node.dataset.src} · ${node.dataset.sym}` : node.dataset.src;
+      node.title = `Show in the code pane: ${node.dataset.src}${node.dataset.sym ? ` · ${node.dataset.sym}` : ''}`;
       const open = (event) => {
         event.preventDefault();
-        openSource({
-          path: node.dataset.src, ref: node.dataset.ref, sym: node.dataset.sym,
-          occurrence: node.dataset.occurrence, lines: node.dataset.lines,
-        }, node);
+        markActive(node);
+        openSource(targetOf(node), node);
       };
       node.addEventListener('click', open);
       node.addEventListener('keydown', (event) => { if (event.key === 'Enter' || event.key === ' ') open(event); });
+    });
+  }
+
+  const targetOf = (node) => ({
+    path: node.dataset.src, ref: node.dataset.ref, sym: node.dataset.sym,
+    occurrence: node.dataset.occurrence, lines: node.dataset.lines,
+    label: node.matches('figure') ? '' : node.textContent.trim().slice(0, 60),
+  });
+
+  // The reference whose code is in the pane is outlined in the guide, so it
+  // is always clear which sentence the pane is explaining.
+  let activeRef = null;
+  function markActive(node) {
+    if (activeRef) activeRef.classList.remove('qz-ref-active');
+    activeRef = node;
+    if (node) node.classList.add('qz-ref-active');
+  }
+
+  // --------------------------------------------------------- code listings
+  // A listing is <figure class="code-listing"> with a <pre>. Lines become
+  // numbered rows; data-src (+ data-lines) adds a button to open the real file,
+  // and check.py verifies the listing text against that file. A bare <pre>
+  // in the guide is wrapped as an unlabelled listing so code always looks
+  // like code.
+  function enhanceListing(figure) {
+    const pre = figure.querySelector('pre');
+    if (!pre) return;
+    if (!pre.querySelector('.l')) {
+      const text = pre.textContent.replace(/\n$/, '');
+      pre.replaceChildren(el('code', {}, text.split('\n').map((line) => el('span', { class: 'l' }, line || ' '))));
+    }
+    const range = /^(\d+)/.exec(figure.dataset.lines || '');
+    if (range) {
+      figure.classList.add('qz-numbered-from');
+      pre.querySelectorAll('.l').forEach((line, i) => { line.dataset.n = Number(range[1]) + i; });
+    }
+    let caption = figure.querySelector('figcaption');
+    if (!caption) {
+      caption = el('figcaption', {}, el('span', { text: figure.dataset.src || 'Code' }));
+      figure.prepend(caption);
+    }
+    if (figure.dataset.src) {
+      figure.classList.add('qz-ref-listing');
+      caption.append(el('button', {
+        class: 'qz-listing-open', type: 'button',
+        onclick: (event) => { markActive(figure); openSource(targetOf(figure), event.currentTarget); },
+      }, 'Show in file ↗'));
+    }
+  }
+
+  function buildListings() {
+    guideRoot.querySelectorAll('pre').forEach((pre) => {
+      if (pre.closest('.code-listing, .qz-exercise, .explain')) return;
+      const figure = el('figure', { class: 'code-listing' });
+      pre.replaceWith(figure);
+      figure.append(pre);
+    });
+    guideRoot.querySelectorAll('figure.code-listing').forEach((figure) => {
+      if (!figure.closest('.qz-exercise')) enhanceListing(figure);
     });
   }
 
@@ -542,8 +640,17 @@
 
   const wide = () => window.matchMedia('(min-width: 1100px)').matches;
 
-  async function openSource(target, trigger) {
-    code.returnFocus = trigger || document.activeElement;
+  let openSeq = 0;
+
+  // opts.quiet: used by auto-follow. Keeps focus where it is and leaves the page scroll alone.
+  async function openSource(target, trigger, opts = {}) {
+    const quiet = Boolean(opts.quiet);
+    const seq = ++openSeq;
+    if (!quiet) {
+      code.returnFocus = trigger || document.activeElement;
+      autoFollow = true;
+      code.userOpened = true;
+    }
     codePane.hidden = false;
     shell.classList.add('qz-code-open');
     backdrop.hidden = wide();
@@ -553,12 +660,12 @@
         codeInfo.textContent = 'Pick a file from the source outline, or follow a reference in the guide.';
         codeBody.replaceChildren();
       }
-      codeTitle.focus();
+      if (!quiet) codeTitle.focus();
       return;
     }
     codeTitle.textContent = target.path;
     codeInfo.textContent = 'Loading…';
-    codeTitle.focus();
+    if (!quiet) codeTitle.focus();
     try {
       let line = 1;
       let end = 1;
@@ -567,16 +674,24 @@
         line = found.line; end = found.end_line;
       } else if (target.sym) {
         const found = await api('symbol', { path: target.path, name: target.sym });
-        line = found.line; end = found.line;
+        line = found.line; end = found.end_line || found.line;
       } else if (target.lines) {
         const match = /^(\d+)(?:-(\d+))?$/.exec(target.lines.trim());
         if (match) { line = Number(match[1]); end = Number(match[2] || match[1]); }
       }
+      if (seq !== openSeq) return;
       code.highlight = target.ref || target.sym || target.lines ? [line, end] : null;
+      code.label = target.label || target.sym || '';
       await loadSource(target.path, { around: line });
+      if (seq !== openSeq) return;
       const row = codeBody.querySelector(`[data-line="${line}"]`);
-      if (row) row.scrollIntoView({ block: 'center' });
+      if (row) {
+        // Scroll only the code pane. scrollIntoView would also move the guide.
+        const top = row.getBoundingClientRect().top - codeBody.getBoundingClientRect().top + codeBody.scrollTop;
+        codeBody.scrollTop = Math.max(0, top - codeBody.clientHeight / 3);
+      }
     } catch (error) {
+      if (seq !== openSeq) return;
       codeInfo.textContent = error.message;
       codeBody.replaceChildren();
     }
@@ -592,7 +707,10 @@
     codeTitle.textContent = data.path;
     const parts = [`Lines ${data.start}–${data.end} of ${data.total}`];
     if (data.status) parts.push(`changed in this PR (${data.status})`);
-    if (code.highlight) parts.push(`highlighting ${code.highlight[0]}${code.highlight[1] !== code.highlight[0] ? `–${code.highlight[1]}` : ''}`);
+    if (code.highlight) {
+      const span = `${code.highlight[0]}${code.highlight[1] !== code.highlight[0] ? `–${code.highlight[1]}` : ''}`;
+      parts.unshift(code.label ? `Showing “${code.label}” · line${span.includes('–') ? 's' : ''} ${span}` : `Highlighting ${span}`);
+    }
     codeInfo.textContent = parts.join(' · ');
     const list = el('ol', { class: 'qz-lines', start: String(data.start) });
     data.lines.forEach((text, i) => {
@@ -653,7 +771,52 @@
     body.focus();
   }
 
+  // Auto-follow: on wide screens the pane shows the code behind whatever claim
+  // is near the top of the guide. Closing the pane turns it off; the Source
+  // button or any reference click turns it back on.
+  let autoFollow = true;
+  let lastAuto = null;
+  let followQueued = false;
+
+  function followScroll() {
+    if (!autoFollow || !wide() || !hasServer || views.guide.hidden) return;
+    const section = modules[state.current];
+    if (!section) return;
+    const refs = [...section.querySelectorAll('.qz-ref[data-src], .qz-ref-listing')].filter((n) => n.offsetParent !== null);
+    if (!refs.length) return;
+    const line = window.innerHeight * 0.4;
+    let pick = refs[0];
+    for (const node of refs) {
+      if (node.getBoundingClientRect().top <= line) pick = node;
+    }
+    if (pick === lastAuto) return;
+    lastAuto = pick;
+    markActive(pick);
+    openSource(targetOf(pick), null, { quiet: true });
+  }
+
+  function queueFollow() {
+    if (followQueued) return;
+    followQueued = true;
+    requestAnimationFrame(() => { followQueued = false; followScroll(); });
+  }
+  window.addEventListener('scroll', queueFollow, { passive: true });
+  window.addEventListener('resize', () => {
+    // Shrinking to a narrow layout turns a pane the reader never asked for
+    // into an overlay; put it away instead.
+    if (!wide() && !codePane.hidden && !code.userOpened) {
+      codePane.hidden = true;
+      shell.classList.remove('qz-code-open');
+      markActive(null);
+    }
+    lastAuto = null;
+    queueFollow();
+  });
+
   function closeSource() {
+    autoFollow = false;
+    code.userOpened = false;
+    markActive(null);
     codePane.hidden = true;
     backdrop.hidden = true;
     shell.classList.remove('qz-code-open');
@@ -943,6 +1106,7 @@
     guideRoot.querySelectorAll('[data-q]').forEach(buildQuestion);
     guideRoot.querySelectorAll('.exercise[data-exercise]').forEach(buildExercise);
     modules.forEach(buildFindings);
+    buildListings();
     buildAnchors();
     buildSide();
     if (hasServer) {
@@ -961,6 +1125,10 @@
     }
     const hashIndex = modules.findIndex((m) => `#${m.id}` === location.hash);
     goTo(hashIndex >= 0 ? hashIndex : state.current, false);
+    // Wide screens: the code pane is open from the start and follows the
+    // reference you are reading. Narrow screens: it stays an on-demand drawer.
+    if (wide() && hasServer) openSource(null, null, { quiet: true });
+    queueFollow();
     document.documentElement.classList.add('qz-ready');
     if (params.has('layoutcheck')) {
       document.body.append(el('script', { src: new URL('layout_check.js', appBase).href }));

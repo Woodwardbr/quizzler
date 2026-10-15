@@ -258,7 +258,8 @@ def find_symbols(rel_path: str, text: str) -> list[dict]:
                     if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
                         kind = "class" if isinstance(node, ast.ClassDef) else "function"
                         name = prefix + node.name
-                        symbols.append({"name": name, "kind": kind, "line": node.lineno})
+                        symbols.append({"name": name, "kind": kind, "line": node.lineno,
+                                        "end_line": node.end_lineno or node.lineno})
                         if isinstance(node, ast.ClassDef):
                             visit(node.body, name + ".")
                     elif isinstance(node, (ast.Assign, ast.AnnAssign)) and not prefix:
@@ -345,6 +346,16 @@ class Finding:
 
 
 @dataclass
+class Listing:
+    """A code listing (``figure.code-listing``) whose text is checked against source."""
+    path: str | None
+    lines: str | None
+    exercise: str | None
+    code: list[str]
+    line: int
+
+
+@dataclass
 class Guide:
     meta: dict = field(default_factory=dict)
     modules: list[str] = field(default_factory=list)
@@ -353,6 +364,7 @@ class Guide:
     questions: list[Question] = field(default_factory=list)
     findings: list[Finding] = field(default_factory=list)
     exercises: list[str] = field(default_factory=list)
+    listings: list[Listing] = field(default_factory=list)
     assets: list[str] = field(default_factory=list)
     inline_scripts: list[int] = field(default_factory=list)
     has_main: bool = False
@@ -435,7 +447,21 @@ class _GuideParser(html.parser.HTMLParser):
             frame["finding_draft"] = finding
         if "data-exercise" in a:
             g.exercises.append(a["data-exercise"])
-        if "data-src" in a:
+            frame["exercise"] = a["data-exercise"]
+        if tag == "figure" and "code-listing" in classes:
+            listing = Listing(a.get("data-src"), a.get("data-lines"), self._ctx("exercise"), [], line)
+            g.listings.append(listing)
+            frame["listing"] = listing
+        listing = self._ctx("listing")
+        if listing is not None and tag == "pre":
+            frame["listing_pre"] = listing
+            listing.code.append("")
+        if listing is not None and tag == "span" and "l" in classes and self._ctx("listing_pre"):
+            # One <span class="l"> per line; start a fresh line unless this is the first.
+            if listing.code and listing.code[-1] != "" or getattr(listing, "_spans", False):
+                listing.code.append("")
+            listing._spans = True
+        if "data-src" in a and tag != "figure":
             occurrence = a.get("data-occurrence")
             if "data-finding" in a:
                 kind = "finding"
@@ -462,6 +488,14 @@ class _GuideParser(html.parser.HTMLParser):
                 return
 
     def handle_data(self, data):
+        listing = self._ctx("listing_pre")
+        if listing is not None:
+            if getattr(listing, "_spans", False):
+                listing.code[-1] += data.replace("\n", "")
+            else:
+                parts = data.split("\n")
+                listing.code[-1] += parts[0]
+                listing.code.extend(parts[1:])
         prompt = self._ctx("prompt")
         if prompt is not None:
             prompt.prompt += data
@@ -487,7 +521,60 @@ def parse_guide(text: str) -> Guide:
     for f in guide.findings:
         f.title = _squash(f.title)
         f.draft = f.draft.strip()
+    for listing in guide.listings:
+        listing.__dict__.pop("_spans", None)
     return guide
+
+
+def listing_drift(listing_lines: list[str], source_lines: list[str]) -> str | None:
+    """Check that a listing's non-blank lines appear, in order, in the source.
+
+    Listings may skip lines (setup boilerplate, an ``...`` marker), but every
+    line they show must be real. Returns a message for the first line that is
+    not found, or None.
+    """
+    wanted = [l.strip() for l in listing_lines if l.strip() and l.strip() not in ("...", "…")]
+    have = [l.strip() for l in source_lines]
+    pos = 0
+    for line in wanted:
+        try:
+            pos = have.index(line, pos) + 1
+        except ValueError:
+            return f"listing line not found in source (in order): {line!r}"
+    return None
+
+
+EXERCISE_BODY_MARKER = "# --- exercise ---"
+
+
+def exercise_listing(path: Path) -> dict:
+    """Source to show for an exercise: the docstring (shown as the prompt) and
+    everything above an optional ``# --- exercise ---`` marker are left out.
+    Lines that print are flagged so the UI can highlight them."""
+    text = read_text(path)
+    lines = text.split("\n")
+    if lines and lines[-1] == "":
+        lines.pop()
+    start = 0
+    marker = next((i for i, l in enumerate(lines) if l.strip() == EXERCISE_BODY_MARKER), None)
+    if marker is not None:
+        start = marker + 1
+    else:
+        try:
+            tree = ast.parse(text)
+            if tree.body and isinstance(tree.body[0], ast.Expr) and isinstance(getattr(tree.body[0], "value", None), ast.Constant) \
+                    and isinstance(tree.body[0].value.value, str):
+                start = tree.body[0].end_lineno
+        except SyntaxError:
+            pass
+    while start < len(lines) and not lines[start].strip():
+        start += 1
+    shown = lines[start:]
+    return {
+        "first_line": start + 1,
+        "lines": shown,
+        "prints": [i + start + 1 for i, l in enumerate(shown) if re.search(r"\bprint\(", l)],
+    }
 
 
 def load_guide(path: Path) -> Guide:
