@@ -32,16 +32,22 @@ class RelayTest(unittest.TestCase):
         return response.status, data
 
     def test_queue_dedupes_and_validates(self):
-        status, first = self.post({"action": "write-module", "module": "m1", "wanted": "deep"})
+        status, first = self.post({"action": "write-modules", "modules": {"m1": "deep"}})
         self.assertEqual((status, first["request"]["status"]), (200, "pending"))
-        status, again = self.post({"action": "write-module", "module": "m1", "wanted": "standard"})
+        status, again = self.post({"action": "write-modules", "modules": {"m1": "standard"}})
         self.assertEqual(again["request"]["id"], first["request"]["id"])
-        self.assertEqual(again["request"]["wanted"], "standard")
-        for bad in ({"action": "rm -rf"}, {"action": "write-module", "module": "nope"},
-                    {"action": "write-module", "module": "m1", "wanted": "extreme"}):
+        self.assertEqual(again["request"]["modules"], {"m1": "standard"})
+        status, helped = self.post({"action": "help-module", "module": "m1", "message": "  explain run  "})
+        self.assertEqual((status, helped["request"]["message"]), (200, "explain run"))
+        for bad in ({"action": "rm -rf"}, {"action": "write-modules", "modules": {}},
+                    {"action": "write-modules", "modules": {"nope": "deep"}},
+                    {"action": "write-modules", "modules": {"m1": "skip"}},
+                    {"action": "help-module", "module": "m1", "message": ""},
+                    {"action": "help-module", "module": "m1", "message": "x" * 3000},
+                    {"action": "help-module", "module": "ghost", "message": "hi"}):
             self.assertEqual(self.post(bad)[0], 400, bad)
         items = gl.update_requests(self.app.requests_path)
-        self.assertEqual(len(items), 1)
+        self.assertEqual(len(items), 2)
         self.assertTrue(self.app.requests_path.is_relative_to(self.fx.onboard / "local"))
 
     def test_wait_returns_when_a_request_arrives_and_done_clears_it(self):

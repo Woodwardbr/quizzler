@@ -556,3 +556,31 @@ section.qz-generating > :not(.qz-work):not(h2):not(.qz-eyebrow) { animation: qz-
 @keyframes qz-shimmer { 50% { opacity: 0.25; } }
 .qz-final-actions { border-top: 1px solid var(--border); margin-top: 2rem; padding-top: 0.5rem; }
 .qz-scoreboard td .qz-rating { margin: 0 0.3rem 0.3rem 0; }
+
+/* One check button per module quiz */
+.qz-quiz-actions {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem;
+  margin: -0.5rem 0 1.5rem; padding: 0.75rem 1.25rem;
+  border: 1px solid var(--border); border-top: 0; border-radius: 0 0 var(--radius) var(--radius);
+  background: var(--surface-2);
+}
+.qz-feedback[data-level="none"] { color: var(--warn); }
+
+/* Help with this module */
+.qz-help {
+  margin-top: 1rem; padding: 1rem 1.25rem; border: 1px solid var(--accent);
+  border-radius: var(--radius); background: var(--accent-soft);
+}
+.qz-help-label { display: block; font-weight: 650; margin-bottom: 0.4rem; }
+.qz-help .qz-dim { margin: 0.6rem 0 0; }
+.qz-pager { flex-wrap: wrap; }
+
+/* End of a round: two clear choices */
+.qz-choice-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: 1rem; margin-top: 0.75rem; }
+.qz-choice-card {
+  border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface);
+  padding: 1rem 1.25rem; display: flex; flex-direction: column; gap: 0.5rem;
+}
+.qz-choice-card h4 { margin: 0; font-size: 1.05rem; }
+.qz-choice-card p { margin: 0; flex: 1; color: var(--muted); }
+.qz-choice-card .qz-btn { align-self: flex-start; }

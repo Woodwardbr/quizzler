@@ -25,30 +25,47 @@ Readers skim, so structure every module for skimming:
 
 ## How a guide grows
 
-Modules are written on demand, not all at once:
+1. **Round 1:** write the overview plus a *skeleton* of every module, then stop. The reader sees the whole course, sets an intensity for each module (or skips it), and presses **Generate modules** at the bottom of the overview.
+2. **Generate modules:** write every module listed in the request, in plan order, at the requested depth. Skipped modules stay skeletons.
+3. **Opening a module never asks you for anything.** Only these buttons queue requests:
+   - **Generate modules**
+   - **Send** in "Help with this module"
+   - **Generate my final review**
+   - The two end-of-round options: **Write my final report** and **Start round N+1**
 
-1. **Round 1:** write the overview, plus a *skeleton* of every module, then stop. This lets the reader see the whole course, click around, and set the intensity of each module before you spend effort on any of them.
-2. **Later rounds:** write modules in study-plan order, at the depth the reader chose, one or two per round. Never write a skipped module beyond its skeleton.
-
-Each module records how far it has been written, in `data-written="skeleton|skim|standard|deep"`. The engine compares that with the reader's chosen intensity. Where the chosen depth is greater, it shows a "not written yet" notice and includes the module under `pending` in the results.
+Each module records how far it has been written, in `data-written="skeleton|skim|standard|deep"`. Where the reader's chosen intensity is deeper, the page shows a notice pointing to Generate modules.
 
 ## Listening for the reader
 
-The page asks you for work through a queue. When the reader opens a module that isn't written to their chosen depth (Start, Next, the sidebar, or "Ask Claude to write it now"), the server queues a request.
+Button presses reach you through a queue:
 
-1. Right after serving, run `python docs/onboarding/relay.py wait` **as a background command**. It exits when a request arrives, which wakes you.
-2. When it exits, read its output (the requests, as text and JSON). Then:
-   1. Ingest the autosaved results.
-   2. Write what was asked, in plan order, at the requested depth.
+1. Right after serving, run `python docs/onboarding/relay.py wait` **as a background command**. It exits when a request arrives, which wakes you. It also marks the request "working", so the page shows that you picked it up.
+2. When it exits, read its output: the requests, as text and JSON. Then:
+   1. Run `progress.py ingest` to read the autosaved results and plan.
+   2. Handle each request (see below).
    3. Validate the guide.
    4. Run `python docs/onboarding/relay.py done <ids>`.
-3. Start `relay.py wait` in the background again **every time**, until the user says they are finished. The page reloads itself when the guide file changes, so do not ask the user to reload.
+3. **The page reloads when you mark the request done, not before.** Write everything first, so the reader never sees a half-written guide. Don't ask the user to reload.
+4. Start `relay.py wait` in the background again **every time**, until the user is finished.
 
-If the page reports that nobody answered, the user will run the command again and say "continue"; pick up from `relay.py list`.
+If the page reports that nobody answered, the user will run the command again and say "continue". Pick up from `relay.py list`.
 
-## End of a round: final review, new round, summary
+### `write-modules`
 
-The last entry in an onboarding guide is the final review. Until you write one, the engine shows a live scoreboard there and a **Generate my final review** button. Handle the three requests it leads to as follows.
+The request lists `{module: intensity}` in plan order. For each module, write the layers up to that intensity (see "Writing a module body"), raise `data-written` to match, and leave every other module alone. Mark the request done only when all the listed modules are written and validated.
+
+### `help-module`
+
+The reader is stuck on one module, and the request carries their question.
+
+- Rewrite that module around the question. Explain the confusing part another way (a new diagram, a smaller step, a concrete trace through the code), and say near the top what changed, in a `note` that starts with "You asked: …".
+- Keep its depth and `data-written`.
+- Keep question ids the reader has already answered, so their answers still line up. You may add new questions with new ids that test the confusing part.
+- Don't touch other modules.
+
+## End of a round: final review, two ways to finish
+
+The last entry in an onboarding guide is the final review. Until you write one, the engine shows a live scoreboard there and a **Generate my final review** button. The written review ends with two choices, which the engine adds as buttons: **Call it a day** (`summary`) and **Go back over what I missed** (`new-round`).
 
 ### `final-review`
 
@@ -58,28 +75,32 @@ The last entry in an onboarding guide is the final review. Until you write one, 
    - **What you've got:** bullets per module, naming the concepts behind mastered answers, with anchors to the code.
    - **What you missed:** bullets per module for misconceptions first, then gaps, then fragile answers, then unanswered questions and missed exercise predictions. Say what the right model is in one line, and anchor it.
    - **From round 2 on:** what improved and what is still shaky, using the "Across rounds" history.
-   - **A refresh plan table:** header `<th>Module</th><th>Why revisit</th>`, with one `<tr data-refresh="<module>" data-intensity="skip|skim|standard|deep">` row per study module. Recommend `skip` for mastered modules and `deep` for modules with misconceptions. The engine adds the dropdowns and the "Start round N+1" and "I'm done" buttons.
+   - **A refresh plan table:** header `<th>Module</th><th>Why revisit</th>`, with one `<tr data-refresh="<module>" data-intensity="skip|skim|standard|deep">` row per study module. Recommend `skip` for mastered modules and `deep` for modules with misconceptions. The engine adds the dropdowns and the two end-of-round buttons.
 3. Validate the guide, then run `relay.py done`.
 
-### `new-round`
+### `new-round` (go back over what I missed)
 
 1. Run `progress.py ingest`. The reader's refresh choices are in the report's "Refresh plan". Then run `progress.py bump --new-round`, which archives the round and sets `data-round`.
 2. Rebuild the guide as a refresher. It doesn't need to keep the old layout, but keep the module ids so the history lines up:
    - **New overview:** what this round focuses on, and a round-history table (module, then the round 1 result, round 2 result, …). The study plan table uses the reader's refresh choices as each row's `data-intensity`, so they become the new recommendations.
-   - **Modules:** skeletons again (`data-written="skeleton"`), written on demand like round 1. Aim them at what was missed. Use new examples and new questions with new ids for re-tested ideas, since mastered questions stay retired. Don't repeat explanations that already worked.
+   - **Modules:** skeletons again (`data-written="skeleton"`). The reader presses Generate modules, as in round 1. Aim them at what was missed. Use new examples and new questions with new ids for re-tested ideas, since mastered questions stay retired. Don't repeat explanations that already worked.
    - **No final review section:** remove the old one, and the engine shows the scoreboard and button again.
 3. Validate the guide, then run `relay.py done`.
 
-### `summary`
+### `summary` (call it a day: the final report)
 
 1. Run `progress.py ingest` and `progress.py report`.
-2. Append `<section class="module" data-module="summary" data-summary data-title="What you learned">` after the final review. Include:
-   - A short narrative of the journey across rounds.
-   - A table per module: final standing and the key concepts, with anchors.
-   - "You can now…" bullets of concrete things the reader can do in this repo.
-   - What remains shaky, as pointers for later.
-3. Write the same summary as Markdown to `docs/onboarding/local/summary.md`.
-4. Validate the guide, run `relay.py done`, and tell the user where the summary is. Stop listening unless they ask for more.
+2. Append `<section class="module" data-module="summary" data-summary data-title="Your final report">` after the final review. It is a report on **how well the reader knows each part of the codebase**:
+   - **Key points:** an overall verdict in 2–3 bullets.
+   - **A mastery table, one row per part of the codebase** (module, with its main directories and files anchored):
+     - a rating: **solid**, **working knowledge**, **shaky** or **not covered**, based on classifications across all rounds;
+     - the concepts behind it;
+     - the round history (for example "r1 gap → r2 mastered").
+   - **"You can now…":** bullets of concrete things the reader can do in this repo.
+   - **"Look at later":** shaky or skipped areas, each with the anchor to start from.
+   - A short note on how the rounds went, if there was more than one.
+3. Write the same report as Markdown to `docs/onboarding/local/summary.md`.
+4. Validate the guide, run `relay.py done`, and tell the user where the report is. Stop listening unless they ask for more.
 
 ## Continuing a guide
 
@@ -89,7 +110,7 @@ Continue when the arguments contain a `QUIZZLER-ONBOARD {...}` result code, when
    - If they pasted a code, save it under `docs/onboarding/local/` and run `python docs/onboarding/progress.py ingest - < that-file`.
    - Otherwise run `python docs/onboarding/progress.py ingest`, which reads the autosaved results.
 2. Run `python docs/onboarding/progress.py report`. Then, if any questions were answered, run `python docs/onboarding/progress.py bump`.
-3. **Write what the plan asks for.** The report's "Write next" list is in plan order. Take the first one or two entries and add the missing layers. Raise each module's `data-written` to the layer you finished. Leave skipped modules as skeletons.
+3. **Write what the plan asks for.** The report's "Write next" list is in plan order. Write all of it, adding the missing layers. Raise each module's `data-written` to the layer you finished. Leave skipped modules as skeletons.
    - **skim layer** (untagged): key points, the main diagram, 2 core questions.
    - **standard layer** (`data-depth="standard"`): walkthrough sub-sections, code listings, the main exercise.
    - **deep layer** (`data-depth="deep"`): edge cases, internals, failure modes, 1–2 harder questions.
@@ -129,7 +150,7 @@ Continue when the arguments contain a `QUIZZLER-ONBOARD {...}` result code, when
 6. Validate:
    - `python docs/onboarding/check.py --guide docs/onboarding/local/guide.html --no-exercises`. Fix every error. Make ambiguous anchors longer.
    - `python docs/onboarding/check_layout.py --guide docs/onboarding/local/guide.html`. Fix any clipped or overlapping labels.
-7. Start the server in the background with `python docs/onboarding/serve.py` (or `--guide <path>`). Give the user the printed URL. Then start `python docs/onboarding/relay.py wait` in the background (see "Listening for the reader"). In round 1, ask them to read the overview, browse the outlines, set an intensity for each module (or skip it), and press "Start the first module". That button asks you to write it, so they don't need to come back here. In later rounds, ask them to answer questions with honest confidence ratings.
+7. Start the server in the background with `python docs/onboarding/serve.py` (or `--guide <path>`). Give the user the printed URL. Then start `python docs/onboarding/relay.py wait` in the background (see "Listening for the reader"). In round 1, ask them to read the overview, browse the outlines, set an intensity for each module (or skip it), and press **Generate modules** at the bottom of the overview. Tell them that everything after that happens through buttons in the page, so they don't need to come back here: **Help with this module** under any module, and **Generate my final review** at the end.
 
 ### Writing a module body (later rounds)
 

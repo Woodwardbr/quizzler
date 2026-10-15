@@ -403,27 +403,38 @@ class Handler(BaseHTTPRequestHandler):
         app = self.app
         app.refresh()
         action = data.get("action")
-        module = data.get("module")
         if action not in gl.REQUEST_ACTIONS:
             raise HTTPError(HTTPStatus.BAD_REQUEST, "unknown action")
-        if action == "write-module" and module not in app.guide.modules:
-            raise HTTPError(HTTPStatus.BAD_REQUEST, "unknown module")
-        if action != "write-module":
-            module = None
-        wanted = data.get("wanted")
-        if wanted is not None and wanted not in gl.INTENSITIES:
-            raise HTTPError(HTTPStatus.BAD_REQUEST, "unknown intensity")
+        extra: dict = {}
+        module = None
+        if action == "write-modules":
+            # {module id: intensity} for every module to write, in plan order.
+            wanted = data.get("modules")
+            if not isinstance(wanted, dict) or not wanted:
+                raise HTTPError(HTTPStatus.BAD_REQUEST, "modules to write are required")
+            for mid, intensity in wanted.items():
+                if mid not in app.guide.modules or intensity not in gl.INTENSITIES or intensity == "skip":
+                    raise HTTPError(HTTPStatus.BAD_REQUEST, f"cannot write module {mid!r} at {intensity!r}")
+            extra["modules"] = wanted
+        elif action == "help-module":
+            module = data.get("module")
+            message = data.get("message")
+            if module not in app.guide.modules:
+                raise HTTPError(HTTPStatus.BAD_REQUEST, "unknown module")
+            if not isinstance(message, str) or not message.strip() or len(message) > gl.MAX_HELP_CHARS:
+                raise HTTPError(HTTPStatus.BAD_REQUEST, f"a help message of 1-{gl.MAX_HELP_CHARS} characters is required")
+            extra["message"] = message.strip()
         created = {}
 
         def add(items):
             for item in items:
                 if item.get("status") in ("pending", "working") and item.get("action") == action \
                         and item.get("module") == module:
-                    item["wanted"] = wanted or item.get("wanted")
+                    item.update(extra)
                     created["request"] = item
                     return
             item = {
-                "id": f"r{len(items) + 1}", "action": action, "module": module, "wanted": wanted,
+                "id": f"r{len(items) + 1}", "action": action, "module": module, **extra,
                 "status": "pending",
                 "created_at": dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat(),
             }
