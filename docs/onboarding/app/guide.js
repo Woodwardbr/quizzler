@@ -318,14 +318,30 @@
       row.append(rating(row.dataset.importance), rating(row.dataset.complexity),
         el('td', {}, select, el('div', { class: 'qz-plan-rec', text: `Recommended: ${recLabel}` })));
     });
-    const start = el('div', { class: 'qz-row qz-plan-actions' },
-      el('button', { class: 'qz-btn', type: 'button', onclick: () => { state.plan = {}; syncPlanSelects(); applyPlan(); scheduleSave(); } }, 'Reset to recommended'),
-      el('button', {
-        class: 'qz-btn qz-primary', type: 'button',
-        onclick: () => { const next = modules.findIndex((s) => s !== overview && !isSkipped(s)); if (next >= 0) goTo(next, true); },
-      }, 'Start the first module →'));
+    const start = el('div', { class: 'qz-plan-actions' });
     (table ? table.closest('.table-wrap') || table : overview.lastElementChild).after(start);
-    // Rows link to modules; the anchor text is the module name.
+  }
+
+  // Below the plan: Generate modules (when any module is not written to the
+  // chosen depth) and Start. Re-rendered whenever the plan or work changes.
+  function renderPlanActions() {
+    const box = overview?.querySelector('.qz-plan-actions');
+    if (!box) return;
+    const pending = Object.keys(pendingModules());
+    const generating = work.has('write-modules');
+    const first = modules.findIndex((s) => !isSpecial(s) && !isSkipped(s));
+    box.replaceChildren(
+      pending.length || generating ? el('p', {}, generating
+        ? 'Claude is writing your modules. The page reloads when they are ready.'
+        : `${pending.length} module${pending.length === 1 ? ' is' : 's are'} not written at your chosen intensity yet. Set your plan, then generate them in one go.`) : '',
+      el('div', { class: 'qz-row' },
+        el('button', { class: 'qz-btn', type: 'button', onclick: () => { state.plan = {}; syncPlanSelects(); applyPlan(); scheduleSave(); } }, 'Reset to recommended'),
+        pending.length && hasServer ? el('button', { class: 'qz-btn qz-primary', type: 'button', disabled: generating, onclick: generateModules },
+          generating ? 'Generating…' : `Generate modules (${pending.length})`) : '',
+        el('button', {
+          class: `qz-btn${pending.length && hasServer ? '' : ' qz-primary'}`, type: 'button', disabled: first < 0,
+          onclick: () => goTo(first, true),
+        }, 'Start the first module →')));
   }
 
   // ------------------------------------------------------- final review
@@ -375,9 +391,9 @@
       el('ol', {},
         el('li', {}, 'Claude reviews what you got and what you missed, module by module.'),
         el('li', {}, 'It recommends how hard to revisit each module. You can change any of them.'),
-        el('li', {}, 'Then either start another round focused on the gaps, or finish with a summary of what you learned.')),
+        el('li', {}, 'Then either go back over what you missed, or call it a day with a final report of how well you know each part of the codebase.')),
       el('div', { class: 'qz-row' },
-        el('button', { class: 'qz-btn qz-primary', type: 'button', disabled: !hasServer, onclick: () => requestWork('final-review', section) }, 'Generate my final review'),
+        el('button', { class: 'qz-btn qz-primary', type: 'button', disabled: !hasServer || work.has('final-review'), onclick: () => requestWork('final-review') }, 'Generate my final review'),
         unanswered ? el('span', { class: 'qz-dim', text: 'You can generate it now; unanswered questions count as not covered.' }) : ''));
     if (!hasServer) section.append(el('p', { class: 'qz-dim', text: 'Generating needs the local guide server (serve.py).' }));
   }
@@ -404,12 +420,16 @@
     });
     const done = modules.some(isSummary);
     final.append(el('div', { class: 'qz-final-actions' },
-      el('h3', { text: done ? 'Want another pass?' : 'What next?' }),
-      el('div', { class: 'qz-row' },
-        el('button', { class: 'qz-btn qz-primary', type: 'button', disabled: !hasServer, onclick: () => requestWork('new-round', final) },
-          `Start round ${round + 1} with this plan`),
-        done ? '' : el('button', { class: 'qz-btn', type: 'button', disabled: !hasServer, onclick: () => requestWork('summary', final) },
-          "I'm done: write my summary"))));
+      el('h3', { text: done ? 'Want another pass?' : 'Two ways to finish' }),
+      el('div', { class: 'qz-choice-cards' },
+        done ? '' : el('div', { class: 'qz-choice-card' },
+          el('h4', { text: 'Call it a day' }),
+          el('p', {}, 'Get a final report: how well you know each part of the codebase, what you can do now, and what to look at later.'),
+          el('button', { class: 'qz-btn qz-primary', type: 'button', disabled: !hasServer, onclick: () => requestWork('summary') }, 'Write my final report')),
+        el('div', { class: 'qz-choice-card' },
+          el('h4', { text: 'Go back over what I missed' }),
+          el('p', {}, `Start round ${round + 1}: the modules above are rewritten to focus on what you missed, at the intensities you set in the table. What you mastered is not repeated.`),
+          el('button', { class: `qz-btn${done ? ' qz-primary' : ''}`, type: 'button', disabled: !hasServer, onclick: () => requestWork('new-round') }, `Start round ${round + 1}`)))));
   }
 
   function syncPlanSelects() {
@@ -453,49 +473,51 @@
           : `Written to ${written} depth so far. You chose ${intensity}; the extra material has not been written yet.`;
         const notice = el('div', { class: 'note qz-pending-banner', role: 'note' },
           el('p', {}, el('strong', { text: written === 'skeleton' ? 'Coming up. ' : 'More to come. ' }), text),
-          hasServer
-            ? el('p', {}, el('button', { class: 'qz-btn', type: 'button', onclick: () => requestModule(section) }, 'Ask Claude to write it now'))
-            : el('p', {}, 'Tell Claude to continue, or use Export results and paste the code.'));
+          el('p', {}, el('button', {
+            class: 'qz-btn', type: 'button', onclick: () => goTo(modules.indexOf(overview), true),
+          }, 'Go to the overview to generate modules')));
         (section.querySelector(':scope > .qz-skip-banner') || section.querySelector('h2'))?.after(notice);
       }
     }
     updateModuleNav();
     if (modules[state.current]) renderPager(state.current);
+    renderPlanActions();
   }
 
   // ----------------------------------------------------- relay to Claude
-  // Buttons that need Claude (write a module, the next review module, the
-  // final review, a new round, the summary) queue a request on the server.
-  // The session's background `relay.py wait` wakes up, marks the request
-  // "working", writes the content, and the page reloads into it. While that
-  // happens the target section shows a generating panel with live status.
-  const work = new Map();  // key -> { action, module, section, status, since }
+  // Only a few buttons ask Claude for work: Generate modules (overview),
+  // Send (help with a module), Generate my final review, and the two end
+  // options. Each queues a request; the session's background
+  // `relay.py wait` wakes up, marks it "working", writes, and marks it
+  // "done". The affected sections show a live generating panel, and the
+  // page reloads once, when the request is done (never mid-write).
+  const work = new Map();  // key -> { id, action, module, modules, status, since }
   const relay = { baseline: null, timer: null, listening: null };
   const RELAY_SLOW_MS = 120000;
 
-  const workKey = (action, module) => (action === 'write-module' ? `module:${module}` : action);
-  const isPending = (section) => section && section !== overview && Boolean(pendingModules()[section.dataset.module]);
+  const workKey = (action, module) => (module ? `${action}:${module}` : action);
+  const isPending = (section) => section && !isSpecial(section) && Boolean(pendingModules()[section.dataset.module]);
   const WORK_TITLE = {
-    'write-module': 'Writing this module',
+    'write-modules': 'Writing your modules',
+    'help-module': 'Rewriting this module for you',
     'next-module': 'Writing the next module',
     'final-review': 'Writing your final review',
-    'new-round': 'Preparing your next round',
-    summary: 'Writing your summary',
+    'new-round': 'Preparing a round on what you missed',
+    summary: 'Writing your final report',
   };
 
-  async function requestWork(action, section, module) {
+  async function requestWork(action, extra = {}) {
     if (!hasServer) return;
-    const key = workKey(action, module);
+    const key = workKey(action, extra.module);
     if (work.has(key)) return;
-    const item = { action, module, section, status: 'sending', since: Date.now() };
+    const item = { action, module: extra.module || null, modules: extra.modules ? Object.keys(extra.modules) : null, status: 'sending', since: Date.now() };
     work.set(key, item);
     renderWork();
     try {
       await saveNow();
-      const body = { action };
-      if (module) Object.assign(body, { module, wanted: intensityOf(module) });
-      await api('request', null, body);
-      item.status = 'pending';
+      const data = await api('request', null, { action, ...extra });
+      item.id = data.request.id;
+      item.status = data.request.status;
       watchForUpdates();
     } catch (error) {
       item.status = 'failed';
@@ -504,33 +526,36 @@
     renderWork();
   }
 
-  function requestModule(section) {
-    if (!isPending(section)) return;
-    requestWork('write-module', section, section.dataset.module);
+  function generateModules() {
+    const pending = pendingModules();
+    const order = studyModules().map((s) => s.dataset.module).filter((id) => pending[id]);
+    if (!order.length) return;
+    requestWork('write-modules', { modules: Object.fromEntries(order.map((id) => [id, pending[id].wanted])) });
   }
 
-  // Ask for the module being opened and the next pending one after it.
-  function requestAround(index) {
-    if (!overview) return;
-    const order = studyModules().filter((s) => !isSkipped(s));
-    const here = modules[index];
-    const start = here === overview || here.dataset.final !== undefined ? 0 : Math.max(0, order.indexOf(here));
-    order.slice(start).filter(isPending).slice(0, 2).forEach(requestModule);
+  function targetsOf(item) {
+    const byId = (id) => modules.find((m) => m.dataset.module === id);
+    if (item.action === 'write-modules') return [overview, ...(item.modules || []).map(byId)].filter(Boolean);
+    if (item.action === 'help-module') return [byId(item.module)].filter(Boolean);
+    if (item.action === 'next-module') return [modules[modules.length - 1]];
+    return [modules.find(isSummary) || modules.find(isFinal) || modules[modules.length - 1]];
   }
 
-  function workPanel(item) {
+  function workPanel(item, section) {
     const slow = Date.now() - item.since > RELAY_SLOW_MS;
     const noListener = relay.listening === false && item.status !== 'working';
+    const many = item.action === 'write-modules' && (item.modules || []).length > 1;
     const steps = [
       ['Request sent', ['pending', 'working'].includes(item.status)],
       ['Claude picked it up', item.status === 'working'],
-      [item.action === 'write-module' ? `Writing it (${intensityOf(item.module)})` : 'Writing', false],
-      ['This page reloads with the result', false],
+      [many ? `Writing ${item.modules.length} modules (this takes a few minutes)` : 'Writing', false],
+      ['This page reloads once everything is ready', false],
     ];
     const current = item.status === 'sending' ? 0 : item.status === 'pending' ? 1 : 2;
+    const title = item.action === 'write-modules' && section !== overview ? 'Writing this module' : WORK_TITLE[item.action] || 'Working';
     const panel = el('div', { class: `qz-work${noListener || item.status === 'failed' ? ' qz-work-stuck' : ''}`, role: 'status', 'aria-live': 'polite' },
       el('div', { class: 'qz-work-head' }, el('span', { class: 'qz-spinner', 'aria-hidden': 'true' }),
-        el('strong', { text: WORK_TITLE[item.action] || 'Working' }),
+        el('strong', { text: title }),
         el('span', { class: 'qz-dim', text: ` · ${Math.max(1, Math.round((Date.now() - item.since) / 1000))}s` })),
       el('ol', { class: 'qz-work-steps' }, steps.map(([label, done], i) => el('li', {
         class: done ? 'qz-step-done' : i === current ? 'qz-step-now' : '',
@@ -541,7 +566,10 @@
       panel.append(el('p', {}, el('strong', { text: 'No Claude session is listening. ' }),
         'Your request is saved. In Claude Code, run /onboard (or /review-pr) and say "continue"; it will be picked up.'));
     } else if (slow) {
-      panel.append(el('p', { class: 'qz-dim', text: 'This is taking a while. Claude may still be reading code; the page will update by itself.' }));
+      panel.append(el('p', { class: 'qz-dim', text: 'This is taking a while. Claude may still be reading code; the page updates by itself when it is done.' }));
+    }
+    if (item.action === 'write-modules' && section === overview) {
+      panel.append(el('p', { class: 'qz-dim', text: 'You can keep reading the overview or answering questions in written modules meanwhile.' }));
     }
     return panel;
   }
@@ -550,16 +578,20 @@
     document.querySelectorAll('.qz-work').forEach((n) => n.remove());
     document.querySelectorAll('.qz-generating').forEach((n) => n.classList.remove('qz-generating'));
     for (const item of work.values()) {
-      const section = item.section || (item.module && modules.find((m) => m.dataset.module === item.module))
-        || modules[modules.length - 1];
-      if (!section) continue;
-      section.classList.add('qz-generating');
-      const anchor = section.querySelector(':scope > h2') || section.querySelector(':scope > .qz-eyebrow') || section.firstElementChild;
-      if (anchor) anchor.after(workPanel(item)); else section.prepend(workPanel(item));
+      for (const section of targetsOf(item)) {
+        if (section !== overview) section.classList.add('qz-generating');
+        const anchor = section.querySelector(':scope > h2') || section.querySelector(':scope > .qz-eyebrow') || section.firstElementChild;
+        const panel = workPanel(item, section);
+        if (section === overview && section.querySelector('.qz-plan-actions')) section.querySelector('.qz-plan-actions').after(panel);
+        else if (anchor) anchor.after(panel); else section.prepend(panel);
+      }
     }
     updateModuleNav();
     if (modules[state.current]) renderPager(state.current);
+    renderPlanActions();
   }
+
+  const writingSections = () => new Set([...work.values()].filter((i) => i.status !== 'failed').flatMap(targetsOf));
 
   function watchForUpdates() {
     if (relay.timer || !hasServer) return;
@@ -571,32 +603,64 @@
       } catch { return; }
       relay.listening = queue.listening;
       if (relay.baseline === null) relay.baseline = meta.guide_mtime;
+      let finished = false;
       for (const req of queue.requests) {
-        const item = work.get(workKey(req.action, req.module));
-        if (item && req.status !== 'done') item.status = req.status;
+        const item = [...work.values()].find((i) => i.id === req.id);
+        if (!item) continue;
+        if (req.status === 'done') finished = true;
+        else item.status = req.status;
       }
-      if (meta.guide_mtime !== relay.baseline) {
+      // Reload once the request is done, so the page never flickers while
+      // Claude is still writing. Other edits to the guide just offer a reload.
+      if (finished) {
         clearInterval(relay.timer);
         relay.timer = null;
-        guideUpdated();
+        guideUpdated(true);
         return;
       }
+      if (!work.size && meta.guide_mtime !== relay.baseline) guideUpdated(false);
       if (work.size) renderWork();
     }, 2000);
   }
 
-  function guideUpdated() {
+  function guideUpdated(auto) {
     const typing = document.activeElement && /^(TEXTAREA|INPUT)$/.test(document.activeElement.tagName)
       && !['radio', 'checkbox'].includes(document.activeElement.type) && document.activeElement.value;
     const reload = async () => { await saveNow(); location.reload(); };
-    if (!typing) {
+    if (auto && !typing) {
       reload();
       return;
     }
     if (document.querySelector('.qz-updated')) return;
     topbar.after(el('div', { class: 'qz-updated', role: 'status' },
-      el('span', {}, 'Claude updated this guide.'),
+      el('span', {}, auto ? 'Claude finished. Your new content is ready.' : 'This guide changed on disk.'),
       el('button', { class: 'qz-btn qz-primary', type: 'button', onclick: reload }, 'Reload to see it')));
+  }
+
+  // ------------------------------------------------------ help with a module
+  const helpBox = el('div', { class: 'qz-help', hidden: true });
+
+  function renderHelp(section) {
+    const input = el('textarea', { rows: '3', class: 'qz-reasoning', id: 'qz-help-text', placeholder: 'For example: "I do not follow how the retry loop decides to give up."' });
+    const status = el('p', { class: 'qz-feedback', role: 'status', 'aria-live': 'polite' });
+    helpBox.replaceChildren(
+      el('label', { for: 'qz-help-text', class: 'qz-help-label' }, 'What do you need help with?'),
+      input,
+      el('p', { class: 'qz-dim' }, 'Claude will rewrite this module around your question, and the page reloads when it is done. ',
+        'You do not have to wait: you can move on to the next module and come back to this one later. ',
+        'Use this only if you would rather stay on this section.'),
+      el('div', { class: 'qz-row' },
+        el('button', {
+          class: 'qz-btn qz-primary', type: 'button',
+          onclick: () => {
+            const message = input.value.trim();
+            if (!message) { status.textContent = 'Say what you would like explained differently.'; input.focus(); return; }
+            requestWork('help-module', { module: section.dataset.module, message });
+            helpBox.hidden = true;
+          },
+        }, 'Send'),
+        el('button', { class: 'qz-btn', type: 'button', onclick: () => { helpBox.hidden = true; renderPager(state.current); } }, 'Cancel'),
+        status));
   }
 
   function moduleProgress(section) {
@@ -629,7 +693,7 @@
       el('span', { class: 'qz-mod-status' }));
       moduleNav.append(el('li', {}, link));
     });
-    guideRoot.append(pager);
+    guideRoot.append(pager, helpBox);
   }
 
   function updateModuleNav() {
@@ -638,7 +702,7 @@
       const section = modules[index];
       const { answered, total } = moduleProgress(section);
       const skipped = isSkipped(section);
-      const writing = work.has(`module:${section.dataset.module}`) || (isFinal(section) && ['final-review', 'new-round', 'summary'].some((a) => work.has(a)));
+      const writing = writingSections().has(section) && section !== overview;
       link.classList.toggle('qz-writing', writing);
       link.querySelector('.qz-mod-status').textContent = writing ? 'writing…' : skipped ? 'skipped'
         : isSkeleton(section) ? 'outline' : total ? `${answered}/${total}` : '';
@@ -671,12 +735,21 @@
     const askNext = isReview && next < 0 && hasServer;
     const nextAsked = work.has('next-module');
     const nextButton = askNext
-      ? el('button', { class: 'qz-btn qz-primary', type: 'button', disabled: nextAsked, onclick: () => requestWork('next-module', modules[index]) },
+      ? el('button', { class: 'qz-btn qz-primary', type: 'button', disabled: nextAsked, onclick: () => requestWork('next-module') },
         nextAsked ? 'Next module requested…' : 'Ask Claude for the next module →')
       : el('button', { class: 'qz-btn qz-primary', type: 'button', disabled: next < 0, onclick: () => goTo(next, true) }, 'Next →');
+    const canHelp = !isReview && hasServer && !isSpecial(section) && !isSkipped(section) && !isSkeleton(section);
+    const helping = work.has(workKey('help-module', section.dataset.module));
     pager.replaceChildren(
       el('button', { class: 'qz-btn', type: 'button', disabled: prev < 0, onclick: () => goTo(prev, true) }, '← Previous'),
       el('span', { class: 'qz-pager-pos' }, position),
+      canHelp ? el('button', {
+        class: 'qz-btn', type: 'button', disabled: helping, 'aria-expanded': String(!helpBox.hidden),
+        onclick: () => {
+          helpBox.hidden = !helpBox.hidden;
+          if (!helpBox.hidden) { renderHelp(section); helpBox.querySelector('textarea').focus(); }
+        },
+      }, helping ? 'Help requested…' : 'Help with this module') : '',
       nextButton,
     );
   }
@@ -687,6 +760,7 @@
     state.current = index;
     modules.forEach((section, i) => { section.hidden = i !== index; });
     if (modules[index].dataset.stub !== undefined) renderFinalStub(modules[index]);
+    helpBox.hidden = true;
     renderPager(index);
     updateModuleNav();
     if (history.replaceState) history.replaceState(null, '', `#${modules[index].id}`);
@@ -699,7 +773,6 @@
     lastAuto = null;
     queueFollow();
     scheduleSave();
-    if (focus) requestAround(index);
   }
 
   const moduleOf = (node) => {
@@ -741,27 +814,27 @@
     const confName = `${name}-conf`;
     const reasoning = el('textarea', { rows: '2', class: 'qz-reasoning', 'aria-label': 'Your reasoning (optional)', placeholder: 'Why? (optional)' });
     const feedback = el('p', { class: 'qz-feedback', role: 'status', 'aria-live': 'polite' });
-    const submit = el('button', { class: 'qz-btn qz-primary', type: 'submit' }, 'Check answer');
-    const form = el('form', { class: 'qz-q-form' },
-      radioGroup(confName, 'How confident are you?', CONFIDENCE, ''),
-      reasoning, el('div', { class: 'qz-row' }, submit, feedback));
+    const form = el('div', { class: 'qz-q-form' },
+      radioGroup(confName, 'How confident are you? (optional, helps tailor what comes next)', CONFIDENCE, ''),
+      reasoning, feedback);
     choices.after(form);
-    form.addEventListener('submit', (event) => {
-      event.preventDefault();
-      if (state.answers[id]) return;
+    // Checked by the module's "Check answers" button. Returns 'checked',
+    // 'already' or 'unanswered'.
+    question.qzCheck = () => {
+      if (state.answers[id]) return 'already';
       const choice = selectedValue(choices, name);
-      const confidence = selectedValue(form, confName);
-      if (!choice || !confidence) {
-        feedback.textContent = 'Pick an answer and how confident you are.';
-        return;
+      if (!choice) {
+        feedback.textContent = 'No answer picked yet.';
+        feedback.dataset.level = 'none';
+        return 'unanswered';
       }
       state.answers[id] = {
-        module: moduleOf(question), choice, confidence, correct: choice === answer,
+        module: moduleOf(question), choice, confidence: selectedValue(form, confName), correct: choice === answer,
         reasoning: reasoning.value.trim(),
       };
       renderQuestion();
-      onProgress(question);
-    });
+      return 'checked';
+    };
 
     function renderQuestion() {
       const record = state.answers[id];
@@ -777,7 +850,6 @@
       });
       reasoning.value = record.reasoning || '';
       reasoning.readOnly = true;
-      submit.disabled = true;
       choices.querySelectorAll('.qz-choice').forEach((label) => {
         label.classList.toggle('qz-correct', label.dataset.choice === answer);
         label.classList.toggle('qz-wrong', label.dataset.choice === record.choice && record.choice !== answer);
@@ -789,6 +861,33 @@
       if (explain) explain.hidden = false;
     }
     renderQuestion();
+  }
+
+  // One "Check answers" button after each module's last question.
+  function buildQuizzes() {
+    for (const section of studyModules()) {
+      const questions = [...section.querySelectorAll('[data-q]')].filter((q) => !q.dataset.retired && q.qzCheck);
+      if (!questions.length) continue;
+      const status = el('p', { class: 'qz-feedback', role: 'status', 'aria-live': 'polite' });
+      const button = el('button', { class: 'qz-btn qz-primary', type: 'button' }, 'Check answers');
+      const bar = el('div', { class: 'qz-quiz-actions' }, button, status);
+      const refresh = () => {
+        const open = questions.filter((q) => !state.answers[q.dataset.q] && !q.closest('.qz-depth-hidden'));
+        bar.hidden = !open.length;
+      };
+      button.addEventListener('click', () => {
+        const results = questions.filter((q) => !q.closest('.qz-depth-hidden')).map((q) => q.qzCheck());
+        const checked = results.filter((r) => r === 'checked').length;
+        const missing = results.filter((r) => r === 'unanswered').length;
+        status.textContent = missing
+          ? `Checked ${checked}. ${missing} question${missing === 1 ? ' has' : 's have'} no answer yet.`
+          : `Checked ${checked}.`;
+        if (checked) onProgress(section);
+        refresh();
+      });
+      questions[questions.length - 1].after(bar);
+      refresh();
+    }
   }
 
   function classify(correct, confidence) {
@@ -1534,6 +1633,7 @@
     buildCodePane();
     await loadSaved();
     guideRoot.querySelectorAll('[data-q]').forEach(buildQuestion);
+    buildQuizzes();
     guideRoot.querySelectorAll('.exercise[data-exercise]').forEach(buildExercise);
     syncPlanSelects();
     applyPlan();
@@ -1548,8 +1648,10 @@
         const queue = await api('requests');
         relay.listening = queue.listening;
         for (const req of queue.requests.filter((r) => r.status !== 'done')) {
-          const created = Date.parse(req.created_at) || Date.now();
-          work.set(workKey(req.action, req.module), { action: req.action, module: req.module, section: null, status: req.status, since: created });
+          work.set(workKey(req.action, req.module), {
+            id: req.id, action: req.action, module: req.module, modules: req.modules ? Object.keys(req.modules) : null,
+            status: req.status, since: Date.parse(req.created_at) || Date.now(),
+          });
         }
         if (work.size) { watchForUpdates(); renderWork(); }
         if (serverMeta.review) {

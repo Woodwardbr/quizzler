@@ -91,14 +91,16 @@ def mark_done(path: Path, ids: list[str] | None) -> list[str]:
 
 
 def describe(item: dict) -> str:
-    if item["action"] == "write-module":
-        depth = f" at {item['wanted']} depth" if item.get("wanted") else ""
-        return f"{item['id']}: write module {item['module']!r}{depth}"
+    if item["action"] == "write-modules":
+        listed = ", ".join(f"{m} ({i})" for m, i in (item.get("modules") or {}).items())
+        return f"{item['id']}: write these modules, in order: {listed}"
+    if item["action"] == "help-module":
+        return f"{item['id']}: rewrite module {item['module']!r} to help with: {item.get('message', '')!r}"
     return f"{item['id']}: " + {
         "next-module": "write the next module",
         "final-review": "write the final review for this round",
-        "new-round": "start a refresher round from the reader's refresh plan",
-        "summary": "the reader is done: write the final summary",
+        "new-round": "go back over missed content: start a refresher round from the refresh plan",
+        "summary": "the reader calls it a day: write the final report",
     }.get(item["action"], item["action"])
 
 

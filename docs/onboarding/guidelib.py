@@ -890,7 +890,8 @@ def grade_answers(payload: dict, guide: Guide | None) -> dict[str, dict]:
         if not isinstance(answer, dict):
             continue
         choice = str(answer.get("choice", ""))
-        confidence = answer.get("confidence") if answer.get("confidence") in CONFIDENCE_LEVELS else "guess"
+        # Confidence is optional; an unrated answer is treated as "not sure".
+        confidence = answer.get("confidence") if answer.get("confidence") in CONFIDENCE_LEVELS else "unrated"
         question = guide.question(qid) if guide else None
         correct = (choice == question.answer) if question else bool(answer.get("correct"))
         graded[qid] = {
@@ -939,11 +940,14 @@ def results_path_for(guide_path: Path, guide_id: str, local_dir: Path = LOCAL_DI
 # ``relay.py wait`` in the background: that command exits as soon as a
 # request is pending, which wakes the session to handle it.
 
-# write-module: write a module to the reader's depth. next-module: review
-# mode, append the next module. final-review: write the end-of-round review.
-# new-round: start a refresher round from the review's refresh plan.
-# summary: the reader is done; write the final summary.
-REQUEST_ACTIONS = ("write-module", "next-module", "final-review", "new-round", "summary")
+# write-modules: write the listed modules to the reader's chosen depths.
+# help-module: rewrite one module around the reader's question.
+# next-module: review mode, append the next module.
+# final-review: write the end-of-round review.
+# new-round: go back over missed content (refresher round).
+# summary: the reader calls it a day; write the final report.
+REQUEST_ACTIONS = ("write-modules", "help-module", "next-module", "final-review", "new-round", "summary")
+MAX_HELP_CHARS = 2000
 LISTENER_STALE_SECONDS = 15
 
 

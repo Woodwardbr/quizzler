@@ -137,16 +137,31 @@ The engine adds importance and complexity badges and an intensity dropdown to ea
 Modules are **written on demand**. `data-written="skeleton|skim|standard|deep"` on a module records how far it has been written. A missing attribute means fully written.
 
 1. `/onboard` writes the overview and a skeleton of every module: what it covers, an outline, and the key code anchors. A skeleton has no questions or exercises.
-2. The reader sets intensities. Claude then writes modules in plan order, only to the chosen depth, and leaves skipped modules as skeletons.
+2. The reader sets intensities and presses **Generate modules** under the plan. Claude writes every pending module in one go, in plan order and only to the chosen depth, and leaves skipped modules as skeletons. Opening a module never triggers writing.
 3. Skeletons show as "outline" in the sidebar. A module whose chosen intensity is deeper than what has been written shows a "not written yet" notice.
 4. The gap is exported as `pending` and listed by `progress.py report` under "Write next".
 5. `check.py` rejects questions or exercises in skeletons, and `data-depth` content deeper than `data-written`.
 
 ### Buttons that reach Claude (relay)
 
-The page cannot call Claude directly, so the server keeps a small request queue next to the results file under `local/`. Opening an onboarding module that isn't written to the chosen depth queues `write-module` for it and for the next pending module. In review mode, "Ask Claude for the next module" queues `next-module`.
+The page cannot call Claude directly, so the server keeps a small request queue next to the results file under `local/`. Only these buttons queue requests:
 
-The Claude session runs `relay.py wait` as a background command. It exits as soon as a request is pending, which wakes the session. The session writes the content, runs `relay.py done <ids>`, and starts waiting again. The page polls for changes to the guide file and reloads into the new content, or offers a reload button if you're typing. This works only while that session is open; if nobody answers within two minutes, the page says so.
+| Button | Request | What Claude does |
+|---|---|---|
+| Generate modules (overview) | `write-modules` | Writes every pending module to its chosen depth |
+| Help with this module → Send | `help-module` | Rewrites that one module around the reader's question |
+| Generate my final review | `final-review` | Writes what was got, what was missed, and a refresh plan |
+| Write my final report | `summary` | Final report: mastery per part of the codebase |
+| Start round N+1 | `new-round` | A refresher round on what was missed |
+| Ask Claude for the next module (review mode) | `next-module` | Appends the next review module |
+
+The steps:
+
+1. The Claude session runs `relay.py wait` as a background command. It exits as soon as a request is pending, which wakes the session, and it marks the request "working". While it waits, it also writes a heartbeat file.
+2. The page shows a generating panel with a spinner on every affected section. The panel follows the request's status: sent, picked up, writing.
+3. If the heartbeat is stale, the panel says no session is listening.
+4. The session writes the content, runs `relay.py done <ids>`, and starts waiting again.
+5. The page reloads **once, when the request is done**, so it never shows a half-written guide. If you're typing, it offers a reload button instead.
 
 ### Writing style
 
@@ -159,6 +174,8 @@ Guides are read by skimming, and the code pane follows the reader, so:
 - On wide screens the source pane is open by default and follows the anchor nearest the top of the screen. The anchor it is showing is outlined. Close pauses following, and clicking any anchor resumes it.
 
 Diagram classes are `box`, `box-accent`, `box-warn`, `edge`, `arrowhead`, `text.title` and `text.small`. They follow the theme. Wrap wide tables in `<div class="table-wrap">`. Wrap the SVG in `.diagram-scroll` so phones scroll the diagram sideways instead of shrinking its labels.
+
+Each module's questions share one **Check answers** button at the end. Rating your confidence is optional; an unrated answer counts as "not sure" when it's classified.
 
 Answers live in the page source (`data-answer`). The guides are for learning, not for exams.
 

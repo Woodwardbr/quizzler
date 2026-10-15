@@ -60,12 +60,13 @@ class BrowserTest(unittest.TestCase):
         self.browser._cmd("WebDriver:Navigate", {"url": app.url})
         self.wait("document.documentElement.classList.contains('qz-ready')")
 
-    def answer(self, qid, choice, confidence):
+    def answer(self, qid, choice, confidence=None):
+        """Pick an answer (and optionally a confidence), then press the module's Check answers."""
         self.js("""
             const q = document.querySelector(`[data-q="${arguments[0]}"]`);
             q.querySelector(`.qz-choices input[value="${arguments[1]}"]`).click();
-            q.querySelector(`.qz-q-form input[value="${arguments[2]}"]`).click();
-            q.querySelector('.qz-q-form button[type=submit]').click();
+            if (arguments[2]) q.querySelector(`.qz-q-form input[value="${arguments[2]}"]`).click();
+            q.closest('section').querySelector('.qz-quiz-actions button').click();
         """, qid, choice, confidence)
 
     def test_onboarding_flow(self):
@@ -75,14 +76,18 @@ class BrowserTest(unittest.TestCase):
         self.serve(app)
         self.assertEqual(self.js("return [...document.querySelectorAll('.qz-mod-label')].map(l => l.firstChild.textContent)"),
                          ["Overview", "Module one", "Final review"])
-        self.js("document.querySelector('.qz-plan-actions .qz-primary').click()")  # start from the overview
+        self.js("[...document.querySelectorAll('.qz-plan-actions button')].find(b => b.textContent.startsWith('Start')).click()")
         self.wait("!document.getElementById('module-m1').hidden")
 
         self.answer("q1", "b", "sure")
         feedback = self.wait("document.querySelector('[data-q=q1] .qz-feedback').textContent")
         self.assertIn("Correct. Mastered", feedback)
-        self.answer("q2", "b", "guess")
+        # q2 has no answer yet: Check answers says so and stays available.
+        self.assertIn("1 question has no answer yet", self.js("return document.querySelector('.qz-quiz-actions .qz-feedback').textContent"))
+        self.assertFalse(self.js("return document.querySelector('.qz-quiz-actions').hidden"))
+        self.answer("q2", "b")  # confidence is optional
         self.assertIn("Gap", self.wait("document.querySelector('[data-q=q2] .qz-feedback').textContent"))
+        self.assertTrue(self.js("return document.querySelector('.qz-quiz-actions').hidden"))
         self.assertEqual(self.js("return document.querySelectorAll('.qz-mod-status')[1].textContent"), "2/2")
 
         # Exercise: a prediction is required before running.
@@ -114,7 +119,7 @@ class BrowserTest(unittest.TestCase):
         while time.monotonic() < deadline and not (saved.is_file() and '"hello"' in saved.read_text()):
             time.sleep(0.1)
         data = json.loads(saved.read_text())
-        self.assertEqual(data["answers"]["q1"]["confidence"], "sure")
+        self.assertEqual((data["answers"]["q1"]["confidence"], data["answers"]["q2"]["confidence"]), ("sure", ""))
         self.assertTrue(data["exercises"]["hello"]["matched"])
         self.js("[...document.querySelectorAll('.qz-top button')].find(b => b.textContent === 'Export results').click()")
         code = self.wait("document.querySelector('.qz-dialog textarea') && document.querySelector('.qz-dialog textarea').value")
@@ -185,40 +190,73 @@ class BrowserTest(unittest.TestCase):
         self.assertEqual(self.js(banners), [])
         self.assertEqual(self.js(statuses), ["", "", "skipped", ""])
 
-    def test_opening_an_outline_asks_claude_and_reloads_when_written(self):
+    def test_generate_modules_button_and_reload_on_done(self):
         import guidelib as gl
+        import relay
         fx = Fixture()
         self.addCleanup(fx.cleanup)
         from support import OVERVIEW
-        body = OVERVIEW + '<section class="module" data-module="m1" data-written="skeleton"><h2>One</h2><ol><li>outline</li></ol></section>'
+        overview = OVERVIEW.replace("</tbody>", '<tr data-plan="m2" data-importance="low" data-complexity="low" data-intensity="skim"><td>2</td><td>y</td></tr></tbody>')
+        body = overview + ('<section class="module" data-module="m1" data-written="skeleton"><h2>One</h2><ol><li>outline</li></ol></section>'
+                           '<section class="module" data-module="m2" data-written="skeleton"><h2>Two</h2><ol><li>outline</li></ol></section>')
         guide = fx.write_guide("guide.html", body)
         app = serve.GuideApp(fx.root, guide, onboard_dir=fx.onboard)
         self.serve(app)
-        self.js("document.querySelector('.qz-plan-actions .qz-primary').click()")  # Start the first module
-        # The section shows it is being written straight away, before Claude starts.
-        self.wait("document.querySelector('#module-m1 .qz-work')")
-        self.assertIn("Writing this module", self.js("return document.querySelector('#module-m1 .qz-work').textContent"))
-        self.assertEqual(self.js("return document.querySelector('.qz-modules a[data-index=\"1\"] .qz-mod-status').textContent"), "writing…")
-        # Nobody is listening yet: the panel says so instead of spinning forever.
-        self.wait("document.querySelector('.qz-work-stuck')", timeout=10)
-        self.assertIn("No Claude session is listening", self.js("return document.querySelector('.qz-work').textContent"))
-        # A listener picks it up: the panel moves to "Claude picked it up".
-        import relay
-        relay.heartbeat(app.requests_path)
-        relay.claim(app.requests_path)
-        self.wait("!document.querySelector('.qz-work-stuck') && document.querySelector('.qz-work .qz-step-done:nth-child(2)')", timeout=10)
+        # Opening a module never asks Claude for anything.
+        self.js("[...document.querySelectorAll('.qz-plan-actions button')].find(b => b.textContent.startsWith('Start')).click()")
+        self.wait("!document.getElementById('module-m1').hidden")
+        time.sleep(0.5)
+        self.assertEqual(gl.update_requests(app.requests_path), [])
+        self.assertIn("Go to the overview to generate modules", self.js("return document.querySelector('#module-m1 .qz-pending-banner').textContent"))
+        # Generate modules asks for every pending module at its chosen depth, in one request.
+        self.js("document.querySelectorAll('.qz-modules a')[0].click()")
+        self.js("[...document.querySelectorAll('.qz-plan-actions button')].find(b => b.textContent.startsWith('Generate modules')).click()")
+        self.wait("document.querySelector('#module-overview .qz-work') && document.querySelector('#module-m2 .qz-work')")
+        statuses = self.js("return [...document.querySelectorAll('.qz-mod-status')].map(s => s.textContent)")
+        self.assertEqual(statuses[1:3], ["writing…", "writing…"])
         deadline = time.monotonic() + 5
         while time.monotonic() < deadline and not gl.update_requests(app.requests_path):
             time.sleep(0.1)
         queued = gl.update_requests(app.requests_path)
-        self.assertEqual([(r["action"], r["module"], r["wanted"]) for r in queued], [("write-module", "m1", "standard")])
-        self.assertEqual(queued[0]["status"], "working")
-        # "Claude" writes the module; the page notices and reloads into it.
+        self.assertEqual([(r["action"], r["modules"]) for r in queued], [("write-modules", {"m1": "standard", "m2": "skim"})])
+        # Claude picks it up and writes m1 first: the page must not reload mid-write.
+        relay.heartbeat(app.requests_path)
+        relay.claim(app.requests_path)
+        self.wait("document.querySelector('#module-overview .qz-work .qz-step-done:nth-child(2)')", timeout=10)
+        self.js("window.__qzMarker = 1")
         time.sleep(0.05)
         guide.write_text(guide.read_text().replace('data-written="skeleton"><h2>One</h2><ol><li>outline</li></ol>',
-                                                   'data-written="standard"><h2>One</h2><p id="written">Now written.</p>'))
-        self.wait("document.getElementById('written') && !document.getElementById('module-m1').hidden", timeout=20)
-        self.assertFalse(self.js("return Boolean(document.querySelector('.qz-pending-banner'))"))
+                                                   'data-written="standard"><h2>One</h2><p id="w1">Written.</p>'))
+        time.sleep(5)
+        self.assertEqual(self.js("return window.__qzMarker"), 1)  # still the same page: no flicker
+        guide.write_text(guide.read_text().replace('data-written="skeleton"><h2>Two</h2><ol><li>outline</li></ol>',
+                                                   'data-written="skim"><h2>Two</h2><p id="w2">Written.</p>'))
+        relay.mark_done(app.requests_path, [queued[0]["id"]])
+        self.wait("document.getElementById('w1') && document.getElementById('w2') && !window.__qzMarker", timeout=20)
+        self.assertFalse(self.js("return Boolean(document.querySelector('.qz-work, .qz-pending-banner'))"))
+
+    def test_help_with_this_module(self):
+        import guidelib as gl
+        fx = Fixture()
+        self.addCleanup(fx.cleanup)
+        app = serve.GuideApp(fx.root, fx.onboard / "guide.html", onboard_dir=fx.onboard)
+        self.serve(app)
+        self.js("document.querySelectorAll('.qz-modules a')[1].click()")
+        self.js("[...document.querySelectorAll('.qz-pager button')].find(b => b.textContent === 'Help with this module').click()")
+        text = self.wait("!document.querySelector('.qz-help').hidden && document.querySelector('.qz-help').textContent")
+        self.assertIn("What do you need help with?", text)
+        self.assertIn("move on to the next module and come back", text)
+        self.js("""const t = document.querySelector('.qz-help textarea'); t.value = 'Why does run return ok?';
+                   [...document.querySelectorAll('.qz-help button')].find(b => b.textContent === 'Send').click();""")
+        self.wait("document.querySelector('#module-m1 .qz-work')")
+        self.assertIn("Rewriting this module for you", self.js("return document.querySelector('#module-m1 .qz-work').textContent"))
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline and not gl.update_requests(app.requests_path):
+            time.sleep(0.1)
+        queued = gl.update_requests(app.requests_path)
+        self.assertEqual([(r["action"], r["module"], r["message"]) for r in queued], [("help-module", "m1", "Why does run return ok?")])
+        self.assertEqual(self.js("return [...document.querySelectorAll('.qz-pager button')].find(b => b.textContent.startsWith('Help')).textContent"),
+                         "Help requested…")
 
     def test_final_review_round_trip(self):
         import guidelib as gl
@@ -244,12 +282,15 @@ class BrowserTest(unittest.TestCase):
   <tr data-refresh="m1" data-intensity="deep"><td>Module one</td><td>missed q2</td></tr></tbody></table></section>"""
         head, tail = guide.read_text().rsplit("</main>", 1)
         guide.write_text(head + final + "</main>" + tail)
+        import relay
+        relay.mark_done(app.requests_path, None)  # Claude marks the request done; only then does the page reload
         self.wait("document.querySelector('#module-final-review [data-refresh] select')", timeout=20)
         self.assertEqual(self.js("return document.querySelector('[data-refresh] select').value"), "deep")
         self.js("const s = document.querySelector('[data-refresh] select'); s.value = 'skim'; s.dispatchEvent(new Event('change'))")
         buttons = self.js("return [...document.querySelectorAll('.qz-final-actions button')].map(b => b.textContent)")
-        self.assertEqual(buttons, ["Start round 2 with this plan", "I'm done: write my summary"])
-        self.js("document.querySelector('.qz-final-actions .qz-primary').click()")
+        self.assertEqual(buttons, ["Write my final report", "Start round 2"])
+        self.assertIn("Call it a day", self.js("return document.querySelector('.qz-final-actions').textContent"))
+        self.js("[...document.querySelectorAll('.qz-final-actions button')].find(b => b.textContent === 'Start round 2').click()")
         self.wait("document.querySelector('#module-final-review .qz-work')")
         deadline = time.monotonic() + 5
         while time.monotonic() < deadline and len(gl.update_requests(app.requests_path)) < 2:
