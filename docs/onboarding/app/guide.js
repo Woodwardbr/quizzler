@@ -42,7 +42,7 @@
   const state = {
     kind: meta.mode, guide: meta.id, version: meta.version, repo: meta.repo,
     pr: meta.pr, head: meta.head,
-    answers: {}, exercises: {}, findings: {}, comments: [], revealed: {}, plan: {}, refresh: {}, current: 0,
+    answers: {}, exercises: {}, findings: {}, comments: [], revealed: {}, plan: {}, refresh: {}, prefs: {}, current: 0,
   };
   let serverMeta = null;
 
@@ -143,7 +143,7 @@
       const data = await api('results');
       const saved = data.results;
       if (saved && saved.guide === meta.id) {
-        for (const key of ['answers', 'exercises', 'findings', 'revealed', 'plan', 'refresh']) {
+        for (const key of ['answers', 'exercises', 'findings', 'revealed', 'plan', 'refresh', 'prefs']) {
           if (saved[key] && typeof saved[key] === 'object') state[key] = saved[key];
         }
         if (Array.isArray(saved.comments)) state.comments = saved.comments;
@@ -155,6 +155,36 @@
       saveStatus.textContent = `Could not load saved progress: ${error.message}`;
     }
   }
+
+  // ---------------------------------------------------------------- theme
+  // Light/dark switch. Starts from the system setting; an explicit choice is
+  // saved with the guide's progress (the port changes every run, so browser
+  // storage alone would forget it) and mirrored to localStorage for the
+  // first paint.
+  const systemDark = () => window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const currentTheme = () => document.documentElement.dataset.theme || (systemDark() ? 'dark' : 'light');
+  const themeButton = el('button', { class: 'qz-btn qz-theme-toggle', type: 'button' });
+
+  function applyTheme(theme) {
+    if (theme === 'light' || theme === 'dark') document.documentElement.dataset.theme = theme;
+    else delete document.documentElement.dataset.theme;
+    const dark = currentTheme() === 'dark';
+    themeButton.replaceChildren(
+      el('span', { class: 'qz-theme-icon', 'aria-hidden': 'true', text: dark ? '☀' : '☾' }),
+      el('span', { class: 'qz-theme-label', text: dark ? 'Light mode' : 'Dark mode' }));
+    themeButton.setAttribute('aria-label', dark ? 'Switch to light mode' : 'Switch to dark mode');
+    themeButton.setAttribute('aria-pressed', String(!dark));
+  }
+
+  themeButton.addEventListener('click', () => {
+    const next = currentTheme() === 'dark' ? 'light' : 'dark';
+    state.prefs.theme = next;
+    try { localStorage.setItem('quizzler-theme', next); } catch { /* storage unavailable */ }
+    applyTheme(next);
+    scheduleSave();
+  });
+  try { applyTheme(localStorage.getItem('quizzler-theme')); } catch { applyTheme(null); }
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', () => applyTheme(document.documentElement.dataset.theme));
 
   // ---------------------------------------------------------------- shell
   const modules = [...guideRoot.querySelectorAll('section.module[data-module]')];
@@ -203,7 +233,8 @@
       badge, tabs,
       el('span', { class: 'qz-top-actions' }, saveStatus,
         el('button', { class: 'qz-btn', type: 'button', onclick: () => openSource(null) }, 'Source'),
-        el('button', { class: 'qz-btn qz-primary', type: 'button', onclick: openExport }, 'Export results')),
+        el('button', { class: 'qz-btn qz-primary', type: 'button', onclick: openExport }, 'Export results'),
+        themeButton),
     );
 
     views.guide = el('div', { class: 'qz-view', id: 'qz-view-guide', role: 'tabpanel', 'aria-labelledby': 'qz-tab-guide' });
@@ -1865,6 +1896,7 @@
     buildPlan();
     buildCodePane();
     await loadSaved();
+    if (state.prefs.theme) applyTheme(state.prefs.theme);
     guideRoot.querySelectorAll('[data-q]').forEach(buildQuestion);
     buildQuizzes();
     guideRoot.querySelectorAll('.exercise[data-exercise]').forEach(buildExercise);

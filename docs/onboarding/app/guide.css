@@ -25,8 +25,10 @@
   color-scheme: light dark;
 }
 
+/* Dark theme: follows the system unless the reader picks one with the
+   top-right switch (data-theme on <html>). */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg: #15171b;
     --surface: #1d2025;
     --surface-2: #262a31;
@@ -45,8 +47,33 @@
     --hl: #4a4119;
     --add: #183a22;
     --del: #43201d;
+    color-scheme: dark;
   }
 }
+
+:root[data-theme="dark"] {
+  --bg: #15171b;
+  --surface: #1d2025;
+  --surface-2: #262a31;
+  --text: #e6e7ea;
+  --muted: #a0a6b0;
+  --border: #383d46;
+  --accent: #7ea6ff;
+  --accent-text: #0f1420;
+  --accent-soft: #1f2b45;
+  --ok: #6fd39b;
+  --ok-soft: #173525;
+  --bad: #ff8a80;
+  --bad-soft: #3d1d1b;
+  --warn: #f3c46b;
+  --warn-soft: #3a2e14;
+  --hl: #4a4119;
+  --add: #183a22;
+  --del: #43201d;
+  color-scheme: dark;
+}
+
+:root[data-theme="light"] { color-scheme: light; }
 
 * { box-sizing: border-box; }
 
@@ -672,3 +699,11 @@ main[data-guide] li.shaky::before { content: "~"; color: var(--warn); }
 .qz-generate-review .qz-btn-big { display: block; margin: 0 auto 0.75rem; }
 .qz-next-steps { margin: 0; padding-left: 1.3rem; }
 .qz-next-steps li { margin: 0.3rem 0; }
+
+/* Light/dark switch */
+.qz-theme-toggle { display: inline-flex; align-items: center; gap: 0.35rem; }
+.qz-theme-toggle .qz-theme-icon { font-size: 1rem; line-height: 1; }
+@media (max-width: 640px) { .qz-theme-toggle .qz-theme-label { display: none; } }
+/* Scrollbars follow the chosen theme, not just the system one. */
+html { scrollbar-color: var(--border) var(--bg); }
+.qz-side, .qz-code-body, .qz-table-scroll, .table-wrap, .diagram-scroll { scrollbar-color: var(--border) transparent; }
