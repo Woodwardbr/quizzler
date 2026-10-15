@@ -109,9 +109,22 @@ def check_guide(guide_path: Path, repo_root: Path, report: Report, *,
         dupes = sorted({m for m in planned if planned.count(m) > 1})
         if dupes:
             report.error(name, f"overview plan lists modules twice: {', '.join(dupes)}")
-    for depth, line in guide.depths:
+    for depth, line, module in guide.depths:
         if depth not in gl.DEPTHS:
             report.error(f"{name}:{line}", f"data-depth must be one of {gl.DEPTHS}")
+        elif module and gl.WRITTEN_RANK.get(guide.written.get(module), 3) < gl.WRITTEN_RANK[depth]:
+            report.error(f"{name}:{line}", f"data-depth={depth!r} content in module {module!r}, "
+                                           f"which is only written to {guide.written[module]!r}; raise data-written")
+    for module, written in guide.written.items():
+        if module == guide.overview:
+            continue
+        if written not in gl.WRITTEN_LEVELS:
+            report.error(name, f"module {module}: data-written must be one of {gl.WRITTEN_LEVELS}")
+        elif written == "skeleton":
+            if any(q.module == module for q in guide.questions):
+                report.error(name, f"module {module} is a skeleton and must not contain questions yet")
+            if any(m == module for _, m in guide.exercise_modules):
+                report.error(name, f"module {module} is a skeleton and must not contain exercises yet")
 
     for q in guide.questions:
         where = f"{name}:{q.line}"

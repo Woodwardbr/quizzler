@@ -120,7 +120,10 @@
   function resultsPayload() {
     const payload = JSON.parse(JSON.stringify(state));
     // Report the effective plan (recommendation unless the reader changed it).
-    if (overview) payload.plan = Object.fromEntries(studyModules().map((s) => [s.dataset.module, intensityOf(s.dataset.module)]));
+    if (overview) {
+      payload.plan = Object.fromEntries(studyModules().map((s) => [s.dataset.module, intensityOf(s.dataset.module)]));
+      payload.pending = pendingModules();
+    }
     return payload;
   }
 
@@ -235,6 +238,22 @@
   const studyModules = () => modules.filter((s) => s !== overview);
   const intensityOf = (id) => state.plan[id] || recommended[id] || 'standard';
   const isSkipped = (section) => section !== overview && intensityOf(section.dataset.module) === 'skip';
+  // data-written: how far a module has been written (missing = fully written).
+  // Modules are generated on demand: a skeleton first, then the depth chosen.
+  const WRITTEN_RANK = { skeleton: -1, skim: 0, standard: 1, deep: 2 };
+  const writtenOf = (section) => section.dataset.written || 'deep';
+  const isSkeleton = (section) => section !== overview && writtenOf(section) === 'skeleton';
+  // Modules whose chosen intensity is deeper than what has been written.
+  function pendingModules() {
+    const pending = {};
+    for (const section of studyModules()) {
+      const wanted = intensityOf(section.dataset.module);
+      if (wanted === 'skip') continue;
+      const written = writtenOf(section);
+      if ((WRITTEN_RANK[written] ?? 2) < (WRITTEN_RANK[wanted] ?? 1)) pending[section.dataset.module] = { written, wanted };
+    }
+    return pending;
+  }
 
   function buildPlan() {
     if (!overview) return;
@@ -317,6 +336,17 @@
       } else if (banner) {
         banner.remove();
       }
+      section.querySelector(':scope > .qz-pending-banner')?.remove();
+      const written = writtenOf(section);
+      if (intensity !== 'skip' && (WRITTEN_RANK[written] ?? 2) < (WRITTEN_RANK[intensity] ?? 1)) {
+        const text = written === 'skeleton'
+          ? `Outline only: this module has not been written yet. It will be written at ${intensity} depth.`
+          : `Written to ${written} depth so far. You chose ${intensity}; the extra material has not been written yet.`;
+        const notice = el('div', { class: 'note qz-pending-banner', role: 'note' },
+          el('p', {}, el('strong', { text: written === 'skeleton' ? 'Coming up. ' : 'More to come. ' }), text),
+          el('p', {}, 'Tell Claude to continue (your plan autosaves), or use Export results and paste the code.'));
+        (section.querySelector(':scope > .qz-skip-banner') || section.querySelector('h2'))?.after(notice);
+      }
     }
     updateModuleNav();
     if (modules[state.current]) renderPager(state.current);
@@ -358,7 +388,9 @@
       const section = modules[index];
       const { answered, total } = moduleProgress(section);
       const skipped = isSkipped(section);
-      link.querySelector('.qz-mod-status').textContent = skipped ? 'skipped' : total ? `${answered}/${total}` : '';
+      link.querySelector('.qz-mod-status').textContent = skipped ? 'skipped'
+        : isSkeleton(section) ? 'outline' : total ? `${answered}/${total}` : '';
+      link.classList.toggle('qz-outline', !skipped && isSkeleton(section));
       link.classList.toggle('qz-done', total > 0 && answered === total);
       link.classList.toggle('qz-skipped', skipped);
       const tag = link.querySelector('.qz-mod-intensity');

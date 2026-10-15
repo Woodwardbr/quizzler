@@ -128,6 +128,27 @@ class DriftGateTest(unittest.TestCase):
                          "no row for: m2", "data-depth must be one of"):
             self.assertIn(expected, errors["b.html"])
 
+    def test_skeleton_rules(self):
+        from support import OVERVIEW
+        body = OVERVIEW + """
+<section class="module" data-module="m1" data-written="skeleton"><h2>One</h2>
+  <div data-q="q1" data-answer="a"><p class="prompt">P</p><ol><li data-choice="a">a</li><li data-choice="b">b</li></ol></div>
+  <div class="exercise" data-exercise="hello"></div>
+</section>"""
+        self.fx.write_guide("s.html", body)
+        self.fx.write_guide("d.html", OVERVIEW + '<section class="module" data-module="m1" data-written="skim"><h2>1</h2>'
+                            '<p data-depth="standard">too deep</p></section>')
+        self.fx.write_guide("w.html", OVERVIEW + '<section class="module" data-module="m1" data-written="mostly"><h2>1</h2></section>')
+        errors = {}
+        for guide in ("s.html", "d.html", "w.html"):
+            report = check.Report()
+            check.check_guide(self.fx.onboard / guide, self.fx.root, report, onboard_dir=self.fx.onboard)
+            errors[guide] = "\n".join(report.errors)
+        self.assertIn("skeleton and must not contain questions", errors["s.html"])
+        self.assertIn("skeleton and must not contain exercises", errors["s.html"])
+        self.assertIn("only written to 'skim'; raise data-written", errors["d.html"])
+        self.assertIn("data-written must be one of", errors["w.html"])
+
     def test_review_guide_needs_sha(self):
         self.fx.write_guide("r.html", DEFAULT_BODY, mode="review")
         report = check.Report()

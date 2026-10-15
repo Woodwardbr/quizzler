@@ -515,3 +515,6 @@ main[data-guide] table.qz-plan td { vertical-align: middle; }
 }
 .qz-modules a.qz-skipped { opacity: 0.55; }
 .qz-modules a.qz-skipped .qz-mod-label { text-decoration: line-through; }
+.qz-modules a.qz-outline .qz-mod-num { border-style: dashed; }
+.qz-modules a.qz-outline .qz-mod-status { font-style: italic; }
+.qz-pending-banner p { margin: 0.2rem 0; }

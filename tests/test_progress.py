@@ -70,6 +70,28 @@ class AdaptiveLoopTest(unittest.TestCase):
         result = progress.bump(tracked, directory, self.local)
         self.assertEqual(result["archived"], str(self.local / "versions" / "fixture.v1.html"))
 
+    def test_skeleton_modules_and_pending_work(self):
+        from support import OVERVIEW
+        overview = OVERVIEW.replace("</tbody>", '<tr data-plan="m2" data-importance="low" data-complexity="low" data-intensity="skip"><td>2</td><td>y</td></tr>'
+                                    '<tr data-plan="m3" data-importance="high" data-complexity="high" data-intensity="deep"><td>3</td><td>z</td></tr></tbody>')
+        body = overview + """
+<section class="module" data-module="m1" data-written="skim"><h2>One</h2><p>skim</p></section>
+<section class="module" data-module="m2" data-written="skeleton"><h2>Two</h2><ol><li>outline</li></ol></section>
+<section class="module" data-module="m3" data-written="skeleton"><h2>Three</h2><ol><li>outline</li></ol></section>"""
+        guide_path = self.fx.write_guide("local/guide.html", body, guide_id="fixture-local")
+        guide = gl.load_guide(guide_path)
+        self.assertEqual(progress.pending_work(guide, {}), [("m1", "skim", "standard"), ("m3", "skeleton", "deep")])
+        self.assertEqual(progress.pending_work(guide, {"m1": "skim", "m2": "standard"}),
+                         [("m2", "skeleton", "standard"), ("m3", "skeleton", "deep")])
+        self.assertIn("m3: skeleton -> deep", progress.report(guide_path.parent, guide))
+        # The CLI reads the autosaved results when no code is given.
+        gl.write_json(guide_path.parent / "results.json",
+                      {"guide": "fixture-local", "version": 1, "answers": {}, "plan": {"m1": "deep", "m3": "skip"}})
+        progress.main(["--guide", str(guide_path), "ingest"])
+        text = progress.report(guide_path.parent, guide)
+        self.assertIn("m1: written skim, reader wants deep", text)
+        self.assertNotIn("m3: written", text)
+
     def test_cli_rejects_wrong_guide(self):
         code = "QUIZZLER-ONBOARD " + json.dumps(dict(self.payload, guide="someone-else"))
         with self.assertRaisesRegex(SystemExit, "is for guide 'someone-else'"):

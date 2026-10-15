@@ -134,6 +134,14 @@ The engine adds importance and complexity badges and an intensity dropdown to ea
 - **Content depth** follows the intensity. Untagged content is always shown. `data-depth="standard"` is hidden when skimming, and `data-depth="deep"` is shown only at deep. Questions in hidden content don't count.
 - **Claude adapts:** the reader's plan goes into the result code and `progress.py report`, so the next version is written at that depth.
 
+Modules are **written on demand**. `data-written="skeleton|skim|standard|deep"` on a module records how far it has been written. A missing attribute means fully written.
+
+1. `/onboard` writes the overview and a skeleton of every module: what it covers, an outline, and the key code anchors. A skeleton has no questions or exercises.
+2. The reader sets intensities. Claude then writes modules in plan order, only to the chosen depth, and leaves skipped modules as skeletons.
+3. Skeletons show as "outline" in the sidebar. A module whose chosen intensity is deeper than what has been written shows a "not written yet" notice.
+4. The gap is exported as `pending` and listed by `progress.py report` under "Write next".
+5. `check.py` rejects questions or exercises in skeletons, and `data-depth` content deeper than `data-written`.
+
 ### Writing style
 
 Guides are read by skimming, and the code pane follows the reader, so:
