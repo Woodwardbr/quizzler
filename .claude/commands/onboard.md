@@ -32,6 +32,20 @@ Modules are written on demand, not all at once:
 
 Each module records how far it has been written, in `data-written="skeleton|skim|standard|deep"`. The engine compares that with the reader's chosen intensity. Where the chosen depth is greater, it shows a "not written yet" notice and includes the module under `pending` in the results.
 
+## Listening for the reader
+
+The page asks you for work through a queue. When the reader opens a module that isn't written to their chosen depth (Start, Next, the sidebar, or "Ask Claude to write it now"), the server queues a request.
+
+1. Right after serving, run `python docs/onboarding/relay.py wait` **as a background command**. It exits when a request arrives, which wakes you.
+2. When it exits, read its output (the requests, as text and JSON). Then:
+   1. Ingest the autosaved results.
+   2. Write what was asked, in plan order, at the requested depth.
+   3. Validate the guide.
+   4. Run `python docs/onboarding/relay.py done <ids>`.
+3. Start `relay.py wait` in the background again **every time**, until the user says they are finished. The page reloads itself when the guide file changes, so do not ask the user to reload.
+
+If the page reports that nobody answered, the user will run the command again and say "continue"; pick up from `relay.py list`.
+
 ## Continuing a guide
 
 Continue when the arguments contain a `QUIZZLER-ONBOARD {...}` result code, when the user says "continue" (or similar), or when they come back after changing the plan.
@@ -52,7 +66,7 @@ Continue when the arguments contain a `QUIZZLER-ONBOARD {...}` result code, when
    - **Mastered questions** are already marked `data-retired`. Do not reword them.
    - **Missed exercise predictions:** walk through the output line by line.
    - Do not change the plan rows' recommended `data-intensity`; the reader's choices are saved separately.
-5. Validate (step 6 below), then tell the user which modules are new or deeper and that they should reload.
+5. Validate (step 6 below), mark any handled relay requests done, and tell the user in one line which modules are new or deeper. The page reloads on its own. Then re-arm `relay.py wait`.
 
 ## Starting a new guide
 
@@ -80,7 +94,7 @@ Continue when the arguments contain a `QUIZZLER-ONBOARD {...}` result code, when
 6. Validate:
    - `python docs/onboarding/check.py --guide docs/onboarding/local/guide.html --no-exercises`. Fix every error. Make ambiguous anchors longer.
    - `python docs/onboarding/check_layout.py --guide docs/onboarding/local/guide.html`. Fix any clipped or overlapping labels.
-7. Start the server in the background with `python docs/onboarding/serve.py` (or `--guide <path>`). Give the user the printed URL. In round 1, ask them to read the overview, browse the outlines, set an intensity for each module (or skip it), then say "continue". The plan autosaves. In later rounds, ask them to answer questions with honest confidence ratings.
+7. Start the server in the background with `python docs/onboarding/serve.py` (or `--guide <path>`). Give the user the printed URL. Then start `python docs/onboarding/relay.py wait` in the background (see "Listening for the reader"). In round 1, ask them to read the overview, browse the outlines, set an intensity for each module (or skip it), and press "Start the first module". That button asks you to write it, so they don't need to come back here. In later rounds, ask them to answer questions with honest confidence ratings.
 
 ### Writing a module body (later rounds)
 

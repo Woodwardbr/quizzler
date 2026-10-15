@@ -183,6 +183,29 @@ class BrowserTest(unittest.TestCase):
         self.assertEqual(self.js(banners), [])
         self.assertEqual(self.js(statuses), ["", "", "skipped"])
 
+    def test_opening_an_outline_asks_claude_and_reloads_when_written(self):
+        import guidelib as gl
+        fx = Fixture()
+        self.addCleanup(fx.cleanup)
+        from support import OVERVIEW
+        body = OVERVIEW + '<section class="module" data-module="m1" data-written="skeleton"><h2>One</h2><ol><li>outline</li></ol></section>'
+        guide = fx.write_guide("guide.html", body)
+        app = serve.GuideApp(fx.root, guide, onboard_dir=fx.onboard)
+        self.serve(app)
+        self.js("document.querySelector('.qz-plan-actions .qz-primary').click()")  # Start the first module
+        self.wait("document.querySelector('.qz-relay')")
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline and not gl.update_requests(app.requests_path):
+            time.sleep(0.1)
+        queued = gl.update_requests(app.requests_path)
+        self.assertEqual([(r["action"], r["module"], r["wanted"]) for r in queued], [("write-module", "m1", "standard")])
+        # "Claude" writes the module; the page notices and reloads into it.
+        time.sleep(0.05)
+        guide.write_text(guide.read_text().replace('data-written="skeleton"><h2>One</h2><ol><li>outline</li></ol>',
+                                                   'data-written="standard"><h2>One</h2><p id="written">Now written.</p>'))
+        self.wait("document.getElementById('written') && !document.getElementById('module-m1').hidden", timeout=20)
+        self.assertFalse(self.js("return Boolean(document.querySelector('.qz-pending-banner'))"))
+
     def test_code_pane_open_by_default_and_follows_scroll(self):
         fx = Fixture()
         self.addCleanup(fx.cleanup)

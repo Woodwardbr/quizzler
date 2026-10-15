@@ -518,3 +518,10 @@ main[data-guide] table.qz-plan td { vertical-align: middle; }
 .qz-modules a.qz-outline .qz-mod-num { border-style: dashed; }
 .qz-modules a.qz-outline .qz-mod-status { font-style: italic; }
 .qz-pending-banner p { margin: 0.2rem 0; }
+
+.qz-updated {
+  position: sticky; top: var(--top-h); z-index: 25; grid-column: 1 / -1;
+  display: flex; gap: 0.75rem; align-items: center; justify-content: center; flex-wrap: wrap;
+  padding: 0.5rem 1rem; background: var(--accent-soft); border-bottom: 1px solid var(--accent);
+}
+.qz-relay { color: var(--muted); font-style: italic; }

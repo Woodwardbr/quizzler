@@ -57,7 +57,9 @@ class GuideApp:
         if not self.guide_path.is_relative_to(self.onboard_dir):
             raise ValueError(f"guide must live under {self.onboard_dir}")
         self.guide_rel = self.guide_path.relative_to(self.onboard_dir).as_posix()
-        self.guide = gl.load_guide(self.guide_path)
+        self._guide_mtime = None
+        self.guide_lock = threading.Lock()
+        self.refresh()
         if not self.guide.has_main:
             raise ValueError(f"{self.guide_path} has no <main data-guide> element")
         self.token = token or secrets.token_urlsafe(32)
@@ -65,19 +67,30 @@ class GuideApp:
         if self.local_dir.is_relative_to(self.repo_root):
             deny.append(self.local_dir.relative_to(self.repo_root).as_posix())
         self.policy = gl.PathPolicy(self.repo_root, tuple(deny))
-        dirs = gl.guide_exercise_dirs(self.guide_path, self.onboard_dir)
-        self.exercises = {}
-        for name in self.guide.exercises:
-            path = gl.resolve_exercise(name, dirs)
-            if path is not None:
-                self.exercises[name] = path
         self.exercise_timeout = exercise_timeout
         self.exercise_lock = threading.Lock()
         self.results_path = gl.results_path_for(self.guide_path, self.guide.guide_id, self.local_dir)
+        self.requests_path = self.results_path.with_name(f"{self.results_path.stem}.requests.json")
         self.results_lock = threading.Lock()
         self.review = review
         self.allow_self_framing = allow_self_framing
         self.port = 0
+
+    def refresh(self) -> None:
+        """Re-read the guide when Claude has rewritten it, so new modules and
+        newly registered exercises take effect without restarting."""
+        with self.guide_lock:
+            mtime = self.guide_path.stat().st_mtime_ns
+            if mtime == self._guide_mtime:
+                return
+            guide = gl.load_guide(self.guide_path)
+            dirs = gl.guide_exercise_dirs(self.guide_path, self.onboard_dir)
+            exercises = {}
+            for name in guide.exercises:
+                path = gl.resolve_exercise(name, dirs)
+                if path is not None:
+                    exercises[name] = path
+            self.guide, self.exercises, self._guide_mtime = guide, exercises, mtime
 
     @property
     def url(self) -> str:
@@ -114,7 +127,9 @@ class GuideApp:
         raise HTTPError(HTTPStatus.NOT_FOUND, "file is not part of this change")
 
     def meta(self) -> dict:
+        self.refresh()
         info = {
+            "guide_mtime": self._guide_mtime,
             "mode": self.guide.mode, "guide": self.guide.guide_id, "version": self.guide.version,
             "guide_path": self.guide_rel, "exercises": sorted(self.exercises), "server": True,
         }
@@ -239,6 +254,7 @@ class Handler(BaseHTTPRequestHandler):
             "api/symbol": lambda: self._symbol(q),
             "api/exercise": lambda: self._exercise_info(q),
             "api/results": lambda: self._load_results(),
+            "api/requests": lambda: {"requests": gl.update_requests(app.requests_path)},
             "api/changes": lambda: {"changes": app.changes(q.get("base"))},
             "api/diff": lambda: self._diff(q),
         }.get(rest)
@@ -305,6 +321,7 @@ class Handler(BaseHTTPRequestHandler):
         return {"path": rel, **symbol, "end_line": symbol.get("end_line", symbol["line"])}
 
     def _exercise_path(self, name) -> Path:
+        self.app.refresh()
         path = self.app.exercises.get(name)
         if path is None:
             raise HTTPError(HTTPStatus.NOT_FOUND, "exercise is not registered for this guide")
@@ -375,7 +392,44 @@ class Handler(BaseHTTPRequestHandler):
             with self.app.results_lock:
                 gl.write_json(self.app.results_path, results)
             return self._json({"saved": True})
+        if rest == "api/request":
+            return self._json(self._add_request(data))
         raise HTTPError(HTTPStatus.NOT_FOUND, "not found")
+
+    def _add_request(self, data: dict) -> dict:
+        """Queue a request for the Claude session (see relay.py)."""
+        import datetime as dt
+        app = self.app
+        app.refresh()
+        action = data.get("action")
+        module = data.get("module")
+        if action not in gl.REQUEST_ACTIONS:
+            raise HTTPError(HTTPStatus.BAD_REQUEST, "unknown action")
+        if action == "write-module" and module not in app.guide.modules:
+            raise HTTPError(HTTPStatus.BAD_REQUEST, "unknown module")
+        if action == "next-module":
+            module = None
+        wanted = data.get("wanted")
+        if wanted is not None and wanted not in gl.INTENSITIES:
+            raise HTTPError(HTTPStatus.BAD_REQUEST, "unknown intensity")
+        created = {}
+
+        def add(items):
+            for item in items:
+                if item.get("status") == "pending" and item.get("action") == action and item.get("module") == module:
+                    item["wanted"] = wanted or item.get("wanted")
+                    created["request"] = item
+                    return
+            item = {
+                "id": f"r{len(items) + 1}", "action": action, "module": module, "wanted": wanted,
+                "status": "pending",
+                "created_at": dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat(),
+            }
+            items.append(item)
+            created["request"] = item
+
+        gl.update_requests(app.requests_path, add)
+        return created
 
 
 def make_server(app: GuideApp, port: int = 0) -> ThreadingHTTPServer:

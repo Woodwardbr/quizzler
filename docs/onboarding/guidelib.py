@@ -905,3 +905,43 @@ def results_path_for(guide_path: Path, guide_id: str, local_dir: Path = LOCAL_DI
         return guide_path.parent / "results.json"
     safe = guide_id if GUIDE_ID_RE.match(guide_id or "") else "guide"
     return local_dir / "results" / f"{safe}.json"
+
+
+# --------------------------------------------------------------------------
+# Requests from the page to the Claude session
+# --------------------------------------------------------------------------
+#
+# The page cannot talk to Claude directly. Instead the server records
+# requests in a JSON queue next to the results file, and the session runs
+# ``relay.py wait`` in the background: that command exits as soon as a
+# request is pending, which wakes the session to handle it.
+
+REQUEST_ACTIONS = ("write-module", "next-module")
+
+
+def requests_path_for(guide_path: Path, guide_id: str, local_dir: Path | None = None) -> Path:
+    results = results_path_for(guide_path, guide_id, local_dir or local_dir_for(guide_path))
+    return results.with_name(f"{results.stem}.requests.json")
+
+
+def update_requests(path: Path, change=None) -> list[dict]:
+    """Read (and optionally modify) the request queue under an exclusive lock.
+
+    ``change`` receives the list and may mutate it; the result is written
+    back atomically. Returns the (updated) list.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path.with_name(path.name + ".lock"), "a+") as lock:
+        try:
+            import fcntl
+            fcntl.flock(lock, fcntl.LOCK_EX)
+        except ImportError:  # Windows: single-user tool, accept the race
+            pass
+        try:
+            items = json.loads(path.read_text(encoding="utf-8")).get("requests", []) if path.is_file() else []
+        except (json.JSONDecodeError, AttributeError):
+            items = []
+        if change is not None:
+            change(items)
+            write_json(path, {"requests": items})
+        return items
