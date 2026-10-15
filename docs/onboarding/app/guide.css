@@ -207,8 +207,31 @@ main[data-guide] > header h1 { font-size: clamp(1.6rem, 3vw, 2.2rem); line-heigh
 .lede { color: var(--muted); font-size: 1.05rem; }
 
 section.module { outline: none; }
-section.module > h2 { font-size: 1.5rem; line-height: 1.25; margin-top: 2rem; }
-section.module h3 { margin-top: 1.75rem; }
+section.module > h2 { font-size: 1.6rem; line-height: 1.25; margin: 0.2rem 0 1rem; }
+section.module > h3, section.module > section > h3 {
+  font-size: 1.15rem; margin: 2.25rem 0 0.75rem; padding-top: 1.25rem; border-top: 1px solid var(--border);
+}
+section.module p, section.module li { max-width: 46rem; }
+section.module ul, section.module ol:not(.choices) { padding-left: 1.4rem; }
+section.module li { margin: 0.35rem 0; }
+section.module li::marker { color: var(--accent); font-weight: 600; }
+
+.qz-eyebrow {
+  margin: 0; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--accent);
+}
+
+/* Callouts for summaries and asides: <div class="key-points">, <div class="note">, <div class="warning"> */
+.key-points, .note, .warning {
+  border-radius: var(--radius); padding: 0.75rem 1rem; margin: 1.25rem 0;
+  border: 1px solid var(--border); border-left-width: 4px;
+}
+.key-points { background: var(--accent-soft); border-left-color: var(--accent); }
+.note { background: var(--surface-2); border-left-color: var(--muted); }
+.warning { background: var(--warn-soft); border-left-color: var(--warn); }
+.key-points > :first-child, .note > :first-child, .warning > :first-child { margin-top: 0; }
+.key-points > :last-child, .note > :last-child, .warning > :last-child { margin-bottom: 0; }
+.key-points h3, .key-points h4 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.06em; margin: 0 0 0.4rem; border: 0; padding: 0; }
 
 .qz-pager {
   display: flex; justify-content: space-between; align-items: center; gap: 0.5rem;
@@ -216,11 +239,25 @@ section.module h3 { margin-top: 1.75rem; }
 }
 .qz-pager-pos { color: var(--muted); font-size: 0.9rem; }
 
+main[data-guide] :not(pre) > code {
+  background: var(--surface-2); border: 1px solid var(--border);
+  padding: 0.05rem 0.3rem; border-radius: 4px; font-size: 0.85em;
+}
 .qz-ref {
   color: var(--accent); cursor: pointer;
   text-decoration: underline dotted; text-underline-offset: 3px;
 }
-code.qz-ref { background: var(--accent-soft); padding: 0.05rem 0.3rem; border-radius: 4px; }
+main[data-guide] code.qz-ref {
+  background: var(--accent-soft); border-color: var(--accent); text-decoration: none;
+}
+main[data-guide] code.qz-ref { white-space: nowrap; }
+code.qz-ref::after { content: " ↗"; font-size: 0.8em; opacity: 0.7; }
+.qz-ref:hover { filter: brightness(1.1); }
+.qz-ref-active, main[data-guide] code.qz-ref-active {
+  outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px;
+  background: var(--hl);
+}
+figure.qz-ref-active { outline-offset: 4px; }
 button.qz-ref { border: 0; background: none; font: inherit; padding: 0; }
 .qz-where { font-family: var(--mono); font-size: 0.85rem; overflow-wrap: anywhere; text-align: left; }
 
@@ -340,7 +377,7 @@ select { font: inherit; font-size: 0.9rem; padding: 0.3rem; border-radius: 6px; 
 
 @media (min-width: 1100px) {
   .qz-shell.qz-code-open {
-    grid-template-columns: 260px minmax(0, 1fr) minmax(24rem, 42%);
+    grid-template-columns: 220px minmax(0, 1fr) minmax(24rem, 40%);
     grid-template-areas: "top top top" "side main code";
   }
   .qz-shell.qz-code-open .qz-code {
@@ -415,3 +452,44 @@ select { font: inherit; font-size: 0.9rem; padding: 0.3rem; border-radius: 6px; 
   .qz-shell { display: block; }
   section.module[hidden] { display: block !important; }
 }
+
+
+/* ------------------------------------------------- exercise code + steps */
+.code-listing { margin: 0.75rem 0 1rem; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; background: var(--bg); }
+.code-listing figcaption {
+  display: flex; gap: 0.5rem; align-items: center; justify-content: space-between;
+  padding: 0.35rem 0.75rem; font-family: var(--mono); font-size: 0.8rem;
+  background: var(--surface-2); color: var(--muted); border-bottom: 1px solid var(--border);
+}
+.code-listing figcaption .tag { font-family: inherit; text-transform: uppercase; letter-spacing: 0.06em; font-size: 0.7rem; }
+.code-listing pre { margin: 0; padding: 0.75rem 0; overflow-x: auto; border: 0; background: none; font-family: var(--mono); font-size: 0.82rem; line-height: 1.55; counter-reset: ln; }
+.code-listing pre code { display: block; background: none; padding: 0; white-space: pre; }
+.code-listing .l { display: block; padding: 0 1rem 0 0; }
+.code-listing .l::before { counter-increment: ln; content: counter(ln); display: inline-block; width: 2.6rem; padding-right: 0.8rem; text-align: right; color: var(--muted); user-select: none; }
+.code-listing .l.out { background: var(--hl); }
+
+.qz-step { display: flex; align-items: center; gap: 0.5rem; margin: 1.1rem 0 0.4rem; font-size: 0.95rem; }
+.qz-step-n { display: inline-grid; place-items: center; width: 1.5rem; height: 1.5rem; border-radius: 50%; background: var(--accent-soft); font-size: 0.8rem; font-weight: 700; }
+.qz-predict { border-left: 3px solid var(--accent); background: var(--surface-2); padding: 0.5rem 0.9rem; border-radius: 0 6px 6px 0; margin: 0 0 0.6rem; }
+.qz-predict p { margin: 0 0 0.3rem; }
+.qz-predict-list { margin: 0.2rem 0; padding-left: 1.3rem; }
+.qz-predict-list li { margin: 0.25rem 0; }
+.qz-output { border-left: 3px solid var(--ok); }
+
+/* Listings numbered from their real line (data-lines or the exercise file). */
+.qz-numbered-from .l::before { content: attr(data-n); counter-increment: none; }
+.code-listing { margin: 1rem 0; }
+.code-listing figcaption > span:first-child { color: var(--text); font-weight: 600; }
+.qz-listing-open {
+  margin-left: auto; border: 1px solid var(--border); background: var(--surface); color: var(--accent);
+  font: inherit; font-size: 0.75rem; padding: 0.1rem 0.5rem; border-radius: 4px; cursor: pointer;
+}
+
+/* Exercise and question blocks read as distinct activities. */
+.qz-exercise { border-top: 4px solid var(--accent); }
+.qz-question { border-top: 4px solid var(--ok); }
+.qz-question .qz-eyebrow { color: var(--ok); margin-bottom: 0.4rem; }
+.qz-ex-head { margin-bottom: 0.25rem; }
+.qz-ex-head .qz-ex-title { margin: 0.1rem 0 0; }
+main[data-guide] .qz-ex-title code { background: none; border: 0; padding: 0; font-size: 1em; }
+section.module > .qz-eyebrow { margin-top: 0.5rem; }

@@ -7,6 +7,22 @@ You are running Quizzler's onboarding flow. Read `docs/onboarding/README.md` for
 
 Arguments: $ARGUMENTS
 
+## Writing style (required)
+
+Readers skim, so structure every module for skimming:
+
+1. **Open with key points.** Start each module with a `<div class="key-points">` that has a `<h3>Key points</h3>` heading and 2–4 bullets.
+2. **Prefer lists to paragraphs.** Use bullets for facts and numbered lists for steps or flows. Keep any remaining paragraph to one or two sentences.
+3. **Draw a diagram for every flow.** Each module has at least one inline SVG diagram of the path, state machine or structure it explains. Use a table for any comparison.
+4. **Split modules into short `<h3>` sub-sections.** Each covers one idea.
+5. **Make code look like code.**
+   - Wrap identifiers, paths and commands in `<code>`.
+   - Show any code longer than one line as `<figure class="code-listing" data-src="path" data-lines="A-B"><pre>…</pre></figure>`, copied exactly. `check.py` verifies it against the file, and the caption gets a "Show in file" button.
+   - Never put code in a paragraph.
+6. **Anchor anything the reader might want to see.** The code pane is open by default on wide screens and follows the anchor the reader is looking at. Without anchors it has nothing to show.
+7. **Don't hand-copy exercise code.** The engine shows it from the file as step 1 ("Read the code"). Put setup boilerplate above a `# --- exercise ---` line to hide it.
+8. **Use asides sparingly.** `<p class="note">` holds a short aside and `<div class="warning">` holds a trap or gotcha.
+
 ## If the arguments contain a `QUIZZLER-ONBOARD {...}` result code
 
 1. Save it to a file under `docs/onboarding/local/` and run `python docs/onboarding/progress.py ingest - < that-file`. If the server autosaved results, read `docs/onboarding/local/results.json` instead (or `local/results/<guide-id>.json` for the shared guide).
@@ -24,10 +40,10 @@ Arguments: $ARGUMENTS
 1. If `docs/onboarding/local/guide.html` exists, ask whether to continue it or start fresh. If the user only wants the shared tour, serve `docs/onboarding/guide.html` and skip to step 6.
 2. Inventory the repository: its language and build/test setup, its major entry points (CLI, HTTP handlers, jobs, UI), and the main data and control paths through them. Read real code. Never describe code you have not opened.
 3. Plan 3–6 modules. Organize them around paths through the system, not around directories. If the user gave a focus area, start there.
-4. Write `docs/onboarding/local/guide.html` with `data-mode="onboard"`, a unique `data-guide-id` and `data-version="1"`. Its asset links are `../app/guide.css` and `../app/guide.js`. In each module:
-   - Write short prose that states one idea at a time.
-   - Add an inline SVG diagram wherever a flow or structure is easier to see than to read about.
-   - Anchor every claim about code with `data-src` plus `data-ref` (a unique literal), `data-sym` or `data-lines`.
+4. Write `docs/onboarding/local/guide.html` with `data-mode="onboard"`, a unique `data-guide-id` and `data-version="1"`. Its asset links are `../app/guide.css` and `../app/guide.js`. Follow the writing style above. In each module:
+   - Open with key points and a diagram.
+   - Use bullets and numbered steps, with short `<h3>` sub-sections.
+   - Anchor every claim about code with `data-src` plus `data-ref` (a unique literal), `data-sym` or `data-lines`. Show multi-line code as a checked `code-listing`.
    - Write 2–3 multiple-choice questions that test understanding of behaviour, not recall of names. Each needs an `.explain`.
    - Add an exercise where predicting output teaches something. Put it in `docs/onboarding/local/exercises/<name>.py`, keep it deterministic and CPU-only, and give it a `PREDICT:` docstring.
 5. Validate:
