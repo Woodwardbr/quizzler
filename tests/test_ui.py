@@ -274,10 +274,8 @@ class BrowserTest(unittest.TestCase):
         self.wait("document.querySelector('#module-final-review table')")
         row = self.js("return [...document.querySelectorAll('#module-final-review tbody td')].map(td => td.textContent)")
         self.assertEqual(row, ["Module onestandard", "1 of 2", "1 mastered"])
-        # Question by question: colour-coded results.
-        results = self.js("return [...document.querySelectorAll('#module-final-review .qz-result')].map(r => [r.dataset.result, r.className])")
-        self.assertEqual([r[0] for r in results], ["mastered", "unanswered"])
-        self.assertIn("qz-result-got", results[0][1])
+        # Before the review is written there is no per-question breakdown.
+        self.assertFalse(self.js("return Boolean(document.querySelector('#module-final-review .qz-result'))"))
         # The button says what it does and what comes after.
         gen = self.js("return document.querySelector('.qz-generate-review').textContent")
         self.assertIn("keep learning", gen)
@@ -308,6 +306,10 @@ class BrowserTest(unittest.TestCase):
                                  ["qz-review-card qz-tone-missed", "What you missed"],
                                  ["qz-review-card qz-tone-plan", "Refresh plan"]])
         self.assertTrue(self.js("return Boolean(document.querySelector('.qz-tone-plan [data-refresh] select'))"))
+        # The written review includes the colour-coded question-by-question card.
+        results = self.js("return [...document.querySelectorAll('#module-final-review .qz-result')].map(r => [r.dataset.result, r.className])")
+        self.assertEqual([r[0] for r in results], ["mastered", "unanswered"])
+        self.assertIn("qz-result-got", results[0][1])
         self.assertEqual(self.js("return getComputedStyle(document.querySelector('li.missed'), '::before').content"), '"✗"')
         self.js("const s = document.querySelector('[data-refresh] select'); s.value = 'skim'; s.dispatchEvent(new Event('change'))")
         buttons = self.js("return [...document.querySelectorAll('.qz-final-actions button')].map(b => b.textContent)")

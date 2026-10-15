@@ -423,8 +423,6 @@
           el('li', {}, unanswered ? `${unanswered} question${unanswered === 1 ? '' : 's'} still unanswered.` : 'Every question in your plan is answered.'),
           unwritten ? el('li', {}, `${unwritten} module${unwritten === 1 ? ' is' : 's are'} not written to your chosen depth yet.`) : '')),
       el('h3', { text: 'Your answers so far' }), table,
-      el('h3', { text: 'Question by question' }),
-      questionBreakdown(),
       el('div', { class: 'qz-generate qz-generate-review' },
         el('button', { class: 'qz-btn qz-primary qz-btn-big', type: 'button', disabled: !hasServer || work.has('final-review'), onclick: () => requestWork('final-review') }, 'Generate review'),
         el('ol', { class: 'qz-next-steps' },
