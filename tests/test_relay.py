@@ -1,0 +1,71 @@
+import http.client
+import json
+import threading
+import time
+import unittest
+
+from support import Fixture
+
+import guidelib as gl
+import relay
+import serve
+
+
+class RelayTest(unittest.TestCase):
+    def setUp(self):
+        self.fx = Fixture()
+        self.app = serve.GuideApp(self.fx.root, self.fx.onboard / "guide.html", onboard_dir=self.fx.onboard)
+        self.server = serve.make_server(self.app)
+        threading.Thread(target=self.server.serve_forever, daemon=True).start()
+
+    def tearDown(self):
+        self.server.shutdown()
+        self.server.server_close()
+        self.fx.cleanup()
+
+    def post(self, body):
+        conn = http.client.HTTPConnection("127.0.0.1", self.app.port, timeout=10)
+        conn.request("POST", f"/t/{self.app.token}/api/request", json.dumps(body), {"Content-Type": "application/json"})
+        response = conn.getresponse()
+        data = json.loads(response.read())
+        conn.close()
+        return response.status, data
+
+    def test_queue_dedupes_and_validates(self):
+        status, first = self.post({"action": "write-module", "module": "m1", "wanted": "deep"})
+        self.assertEqual((status, first["request"]["status"]), (200, "pending"))
+        status, again = self.post({"action": "write-module", "module": "m1", "wanted": "standard"})
+        self.assertEqual(again["request"]["id"], first["request"]["id"])
+        self.assertEqual(again["request"]["wanted"], "standard")
+        for bad in ({"action": "rm -rf"}, {"action": "write-module", "module": "nope"},
+                    {"action": "write-module", "module": "m1", "wanted": "extreme"}):
+            self.assertEqual(self.post(bad)[0], 400, bad)
+        items = gl.update_requests(self.app.requests_path)
+        self.assertEqual(len(items), 1)
+        self.assertTrue(self.app.requests_path.is_relative_to(self.fx.onboard / "local"))
+
+    def test_wait_returns_when_a_request_arrives_and_done_clears_it(self):
+        path = self.app.requests_path
+        self.assertEqual(relay.wait(path, timeout=0.2, interval=0.05), [])
+        threading.Timer(0.3, lambda: self.post({"action": "next-module"})).start()
+        started = time.monotonic()
+        found = relay.wait(path, timeout=10, interval=0.05)
+        self.assertLess(time.monotonic() - started, 5)
+        self.assertEqual([r["action"] for r in found], ["next-module"])
+        self.assertEqual(relay.mark_done(path, [found[0]["id"]]), [found[0]["id"]])
+        self.assertEqual(relay.pending(path), [])
+
+    def test_server_picks_up_rewritten_guide(self):
+        before = self.app.meta()["guide_mtime"]
+        self.assertNotIn("extra", self.app.exercises)
+        self.fx.write("docs/onboarding/exercises/extra.py", '"""PREDICT: x"""\nprint(1)\n')
+        time.sleep(0.01)
+        guide = self.fx.onboard / "guide.html"
+        head, tail = guide.read_text().rsplit("</section>", 1)
+        guide.write_text(head + '<div class="exercise" data-exercise="extra"></div></section>' + tail)
+        self.assertNotEqual(self.app.meta()["guide_mtime"], before)
+        self.assertIn("extra", self.app.exercises)
+
+
+if __name__ == "__main__":
+    unittest.main()

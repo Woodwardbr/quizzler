@@ -104,6 +104,12 @@
   let saveTimer = null;
   const saveStatus = el('span', { class: 'qz-save', role: 'status', 'aria-live': 'polite' });
 
+  function flushSave() {
+    if (!hasServer) return;
+    clearTimeout(saveTimer);
+    api('results', null, { results: resultsPayload() }).catch(() => {});
+  }
+
   function scheduleSave() {
     if (!hasServer) return;
     clearTimeout(saveTimer);
@@ -344,12 +350,103 @@
           : `Written to ${written} depth so far. You chose ${intensity}; the extra material has not been written yet.`;
         const notice = el('div', { class: 'note qz-pending-banner', role: 'note' },
           el('p', {}, el('strong', { text: written === 'skeleton' ? 'Coming up. ' : 'More to come. ' }), text),
-          el('p', {}, 'Tell Claude to continue (your plan autosaves), or use Export results and paste the code.'));
+          relayStatus(section));
         (section.querySelector(':scope > .qz-skip-banner') || section.querySelector('h2'))?.after(notice);
       }
     }
     updateModuleNav();
     if (modules[state.current]) renderPager(state.current);
+  }
+
+  // ----------------------------------------------------- relay to Claude
+  // Opening a module that is not written to the chosen depth asks the Claude
+  // session to write it (and the next one, so it is ready in time). The
+  // server queues the request; the session's background `relay.py wait`
+  // wakes it. When the guide file changes, the page reloads into it.
+  const relay = { requested: new Set(), since: null, baseline: null, timer: null, nextAsked: false };
+  const RELAY_SLOW_MS = 120000;
+
+  const isPending = (section) => section && section !== overview && Boolean(pendingModules()[section.dataset.module]);
+
+  function relayStatus(section) {
+    const id = section.dataset.module;
+    if (!hasServer) return el('p', {}, 'Tell Claude to continue, or use Export results and paste the code.');
+    if (!relay.requested.has(id)) {
+      return el('p', {}, el('button', { class: 'qz-btn', type: 'button', onclick: () => requestModule(section) }, 'Ask Claude to write it now'));
+    }
+    const slow = relay.since && Date.now() - relay.since > RELAY_SLOW_MS;
+    return el('p', { class: 'qz-relay', role: 'status' }, slow
+      ? 'Still waiting. Is the Claude session that ran /onboard still open? If not, run /onboard again and say "continue".'
+      : 'Claude has been asked to write this. The page reloads when it is ready.');
+  }
+
+  async function requestModule(section) {
+    if (!hasServer || !isPending(section) || relay.requested.has(section.dataset.module)) return;
+    relay.requested.add(section.dataset.module);
+    try {
+      flushSave();
+      await api('request', null, { action: 'write-module', module: section.dataset.module, wanted: intensityOf(section.dataset.module) });
+      relay.since ||= Date.now();
+      watchForUpdates();
+    } catch (error) {
+      relay.requested.delete(section.dataset.module);
+      saveStatus.textContent = `Could not reach Claude: ${error.message}`;
+    }
+    applyPlan();
+  }
+
+  async function requestNextModule() {
+    if (!hasServer || relay.nextAsked) return;
+    relay.nextAsked = true;
+    try {
+      flushSave();
+      await api('request', null, { action: 'next-module' });
+      relay.since ||= Date.now();
+      watchForUpdates();
+    } catch (error) {
+      relay.nextAsked = false;
+      saveStatus.textContent = `Could not reach Claude: ${error.message}`;
+    }
+    renderPager(state.current);
+  }
+
+  // Ask for the module being opened and the next pending one after it.
+  function requestAround(index) {
+    if (!overview) return;
+    const order = studyModules().filter((s) => !isSkipped(s));
+    const here = modules[index];
+    const start = here === overview ? 0 : Math.max(0, order.indexOf(here));
+    order.slice(start).filter(isPending).slice(0, 2).forEach(requestModule);
+  }
+
+  function watchForUpdates() {
+    if (relay.timer || !hasServer) return;
+    relay.timer = setInterval(async () => {
+      let meta;
+      try { meta = await api('meta'); } catch { return; }
+      if (relay.baseline === null) { relay.baseline = meta.guide_mtime; return; }
+      if (meta.guide_mtime !== relay.baseline) {
+        clearInterval(relay.timer);
+        relay.timer = null;
+        guideUpdated();
+      } else if (relay.since && Date.now() - relay.since > RELAY_SLOW_MS) {
+        applyPlan();  // switch notices to the "still waiting" wording
+      }
+    }, 3000);
+  }
+
+  function guideUpdated() {
+    const typing = document.activeElement && /^(TEXTAREA|INPUT)$/.test(document.activeElement.tagName)
+      && document.activeElement.type !== 'radio';
+    const reload = () => { flushSave(); setTimeout(() => location.reload(), 300); };
+    if (!typing && (isPending(modules[state.current]) || modules[state.current] === overview)) {
+      reload();
+      return;
+    }
+    if (document.querySelector('.qz-updated')) return;
+    topbar.after(el('div', { class: 'qz-updated', role: 'status' },
+      el('span', {}, 'Claude updated this guide.'),
+      el('button', { class: 'qz-btn qz-primary', type: 'button', onclick: reload }, 'Reload to see it')));
   }
 
   function moduleProgress(section) {
@@ -414,10 +511,17 @@
     const section = modules[index];
     const position = section === overview ? 'Overview'
       : `Module ${studyModules().indexOf(section) + 1} of ${studyModules().length}`;
+    // Review guides grow one module at a time: at the last written module,
+    // Next asks Claude for the next one instead.
+    const askNext = isReview && next < 0 && hasServer;
+    const nextButton = askNext
+      ? el('button', { class: 'qz-btn qz-primary', type: 'button', disabled: relay.nextAsked, onclick: requestNextModule },
+        relay.nextAsked ? 'Next module requested…' : 'Ask Claude for the next module →')
+      : el('button', { class: 'qz-btn qz-primary', type: 'button', disabled: next < 0, onclick: () => goTo(next, true) }, 'Next →');
     pager.replaceChildren(
       el('button', { class: 'qz-btn', type: 'button', disabled: prev < 0, onclick: () => goTo(prev, true) }, '← Previous'),
       el('span', { class: 'qz-pager-pos' }, position),
-      el('button', { class: 'qz-btn qz-primary', type: 'button', disabled: next < 0, onclick: () => goTo(next, true) }, 'Next →'),
+      nextButton,
     );
   }
 
@@ -438,6 +542,7 @@
     lastAuto = null;
     queueFollow();
     scheduleSave();
+    if (focus) requestAround(index);
   }
 
   const moduleOf = (node) => {
@@ -1281,6 +1386,13 @@
     if (hasServer) {
       try {
         serverMeta = await api('meta');
+        relay.baseline = serverMeta.guide_mtime;
+        const queued = (await api('requests')).requests.filter((r) => r.status === 'pending');
+        for (const item of queued) {
+          if (item.action === 'write-module') relay.requested.add(item.module);
+          else relay.nextAsked = true;
+        }
+        if (queued.length) { relay.since = Date.now(); watchForUpdates(); applyPlan(); }
         if (serverMeta.review) {
           changesState.base = serverMeta.review.diff_base;
           Object.assign(state, { head: serverMeta.review.head_sha, pr: String(serverMeta.review.pr ?? state.pr) });

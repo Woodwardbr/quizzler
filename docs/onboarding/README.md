@@ -142,6 +142,12 @@ Modules are **written on demand**. `data-written="skeleton|skim|standard|deep"` 
 4. The gap is exported as `pending` and listed by `progress.py report` under "Write next".
 5. `check.py` rejects questions or exercises in skeletons, and `data-depth` content deeper than `data-written`.
 
+### Buttons that reach Claude (relay)
+
+The page cannot call Claude directly, so the server keeps a small request queue next to the results file under `local/`. Opening an onboarding module that isn't written to the chosen depth queues `write-module` for it and for the next pending module. In review mode, "Ask Claude for the next module" queues `next-module`.
+
+The Claude session runs `relay.py wait` as a background command. It exits as soon as a request is pending, which wakes the session. The session writes the content, runs `relay.py done <ids>`, and starts waiting again. The page polls for changes to the guide file and reloads into the new content, or offers a reload button if you're typing. This works only while that session is open; if nobody answers within two minutes, the page says so.
+
 ### Writing style
 
 Guides are read by skimming, and the code pane follows the reader, so:
