@@ -106,6 +106,34 @@ A guide is an HTML file somewhere under `docs/onboarding/`. Its asset links are 
 </main>
 ```
 
+### Overview and study plan (onboarding)
+
+An onboarding guide starts with an overview module. `check.py` enforces it. The overview contains:
+
+- What the repo does.
+- A diagram of the whole system.
+- A table of where things live.
+- A plan table with no quiz:
+
+```html
+<section class="module" data-module="overview" data-overview data-title="Overview and study plan">
+  …
+  <table>
+    <thead><tr><th>Module</th><th>What you will learn</th></tr></thead>
+    <tbody>
+      <tr data-plan="persistence" data-importance="high" data-complexity="medium" data-intensity="deep">
+        <td>Persistence</td><td>How rows are written and retried.</td></tr>
+    </tbody>
+  </table>
+</section>
+```
+
+The engine adds importance and complexity badges and an intensity dropdown to each row. The dropdown offers **skip**, **skim**, **standard** and **deep**, with the author's choice marked "recommended".
+
+- **Skip** removes the module from Previous/Next and from progress. The module stays reachable from the sidebar, which offers to include it again.
+- **Content depth** follows the intensity. Untagged content is always shown. `data-depth="standard"` is hidden when skimming, and `data-depth="deep"` is shown only at deep. Questions in hidden content don't count.
+- **Claude adapts:** the reader's plan goes into the result code and `progress.py report`, so the next version is written at that depth.
+
 ### Writing style
 
 Guides are read by skimming, and the code pane follows the reader, so:

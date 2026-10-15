@@ -493,3 +493,25 @@ select { font: inherit; font-size: 0.9rem; padding: 0.3rem; border-radius: 6px; 
 .qz-ex-head .qz-ex-title { margin: 0.1rem 0 0; }
 main[data-guide] .qz-ex-title code { background: none; border: 0; padding: 0; font-size: 1em; }
 section.module > .qz-eyebrow { margin-top: 0.5rem; }
+
+/* Study plan (overview module) */
+.qz-depth-hidden { display: none !important; }
+.qz-rating {
+  display: inline-block; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+  padding: 0.1rem 0.45rem; border-radius: 999px; background: var(--surface-2); color: var(--muted); white-space: nowrap;
+}
+.qz-rating-high { background: var(--bad-soft); color: var(--bad); }
+.qz-rating-medium { background: var(--warn-soft); color: var(--warn); }
+.qz-rating-low { background: var(--ok-soft); color: var(--ok); }
+.qz-intensity { min-width: 7.5rem; }
+main[data-guide] table.qz-plan td { vertical-align: middle; }
+.qz-plan td:first-child a { font-weight: 600; }
+.qz-plan-desc { color: var(--muted); font-size: 0.9em; margin-top: 0.15rem; }
+.qz-plan-rec { color: var(--muted); font-size: 0.75rem; margin-top: 0.2rem; white-space: nowrap; }
+.qz-plan-actions { justify-content: flex-end; margin-bottom: 1.5rem; }
+.qz-mod-intensity {
+  display: block; font-size: 0.7rem; font-weight: 400; color: var(--muted);
+  text-transform: uppercase; letter-spacing: 0.05em;
+}
+.qz-modules a.qz-skipped { opacity: 0.55; }
+.qz-modules a.qz-skipped .qz-mod-label { text-decoration: line-through; }

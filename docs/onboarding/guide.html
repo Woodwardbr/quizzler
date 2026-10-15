@@ -14,18 +14,18 @@
     <p class="lede">Quizzler teaches a repository, or a pull request, in small interactive modules. This guide walks through Quizzler's own code. Each module ends with questions. Rate how confident you are in each answer, because the next version of the guide adapts to those ratings.</p>
   </header>
 
-  <section class="module" data-module="map" data-title="One engine, two entry points">
-    <h2>One engine, two entry points</h2>
+  <section class="module" data-module="overview" data-overview data-title="Overview and study plan">
+    <h2>What Quizzler is, and your study plan</h2>
     <div class="key-points">
-      <h3>Key points</h3>
+      <h3>In one minute</h3>
       <ul>
-        <li><code>/onboard</code> teaches a repository. <code>/review-pr &lt;N&gt;</code> teaches a pull request and collects your review.</li>
-        <li>Both produce the same thing: a static HTML guide that loads <code data-src="docs/onboarding/app/guide.js" data-ref="Quizzler guide engine.">app/guide.js</code> and <code>app/guide.css</code>.</li>
-        <li>A small local server, <code data-src="docs/onboarding/serve.py" data-sym="GuideApp">GuideApp</code>, serves the guide and gives the browser read-only access to source.</li>
+        <li><strong>What it does:</strong> Quizzler turns a repository, or a pull request, into an interactive guide you work through in small modules.</li>
+        <li><strong>How:</strong> Claude writes a static HTML guide. A small local server shows it next to the real source, and your answers shape the next version.</li>
+        <li><strong>Stack:</strong> Python standard library, plain JavaScript, Git. No framework and no build step.</li>
       </ul>
     </div>
-    <p class="note">Highlighted code like <code data-src="docs/onboarding/serve.py" data-sym="GuideApp">GuideApp</code> is a link: the code pane on the right shows it, and follows along as you scroll.</p>
 
+    <h3>The whole system</h3>
     <figure class="diagram">
       <div class="diagram-scroll">
       <svg viewBox="0 0 640 250" role="img" aria-labelledby="map-title map-desc">
@@ -59,6 +59,56 @@
       </div>
       <figcaption>The loop: Claude writes a guide, you work through it, and your answers shape the next version. Everything personal stays in <code>docs/onboarding/local/</code>, which Git ignores.</figcaption>
     </figure>
+
+    <h3>Where things live</h3>
+    <div class="table-wrap">
+    <table>
+      <thead><tr><th>Path</th><th>What is there</th></tr></thead>
+      <tbody>
+        <tr><td><code>.claude/commands/</code></td><td>The <code>/onboard</code> and <code>/review-pr</code> instructions for Claude.</td></tr>
+        <tr><td><code data-src="docs/onboarding/serve.py" data-sym="GuideApp">docs/onboarding/serve.py</code></td><td>The loopback server.</td></tr>
+        <tr><td><code data-src="docs/onboarding/guidelib.py" data-sym="PathPolicy">docs/onboarding/guidelib.py</code></td><td>Shared logic: path policy, anchors, guide parser, exercise runner, git diffs.</td></tr>
+        <tr><td><code data-src="docs/onboarding/app/guide.js" data-ref="Quizzler guide engine.">docs/onboarding/app/</code></td><td>The browser engine (<code>guide.js</code>, <code>guide.css</code>).</td></tr>
+        <tr><td><code>docs/onboarding/*.py</code></td><td>The CLI tools: <code>check</code>, <code>check_layout</code>, <code>review</code>, <code>progress</code>.</td></tr>
+        <tr><td><code>docs/onboarding/local/</code></td><td>Your personal state. Git ignores it.</td></tr>
+        <tr><td><code>tests/</code></td><td>Unit, server, review and browser tests.</td></tr>
+      </tbody>
+    </table>
+    </div>
+
+    <h3>Your study plan</h3>
+    <p>Each module is rated for importance and complexity, with a recommended intensity. Change any of them below:</p>
+    <ul>
+      <li><strong>Skip:</strong> the module is left out of navigation and progress.</li>
+      <li><strong>Skim:</strong> only the key points, diagrams and questions.</li>
+      <li><strong>Standard:</strong> adds walkthroughs and code listings.</li>
+      <li><strong>Deep:</strong> adds edge cases and internals.</li>
+    </ul>
+    <div class="table-wrap">
+    <table>
+      <thead><tr><th>Module</th><th>What you will learn</th></tr></thead>
+      <tbody>
+        <tr data-plan="map" data-importance="high" data-complexity="low" data-intensity="standard"><td>One engine, two entry points</td><td>How the commands, guide, server and browser fit together.</td></tr>
+        <tr data-plan="server" data-importance="high" data-complexity="medium" data-intensity="deep"><td>The server's security boundary</td><td>The four layers between a web page and your files.</td></tr>
+        <tr data-plan="contract" data-importance="medium" data-complexity="medium" data-intensity="standard"><td>Guides that cannot silently rot</td><td>Anchors, listings and the CI drift gate.</td></tr>
+        <tr data-plan="loop" data-importance="medium" data-complexity="high" data-intensity="skim"><td>The adaptive loop and PR review</td><td>How answers shape the next version, and how reviews stay unposted.</td></tr>
+      </tbody>
+    </table>
+    </div>
+  </section>
+
+  <section class="module" data-module="map" data-title="One engine, two entry points">
+    <h2>One engine, two entry points</h2>
+    <div class="key-points">
+      <h3>Key points</h3>
+      <ul>
+        <li><code>/onboard</code> teaches a repository. <code>/review-pr &lt;N&gt;</code> teaches a pull request and collects your review.</li>
+        <li>Both produce the same thing: a static HTML guide that loads <code data-src="docs/onboarding/app/guide.js" data-ref="Quizzler guide engine.">app/guide.js</code> and <code>app/guide.css</code>.</li>
+        <li>A small local server, <code data-src="docs/onboarding/serve.py" data-sym="GuideApp">GuideApp</code>, serves the guide and gives the browser read-only access to source.</li>
+      </ul>
+    </div>
+    <p class="note">Highlighted code like <code data-src="docs/onboarding/serve.py" data-sym="GuideApp">GuideApp</code> is a link: the code pane on the right shows it, and follows along as you scroll.</p>
+
 
     <p>The command-line tools sit next to the server:</p>
     <div class="table-wrap">
@@ -112,6 +162,7 @@
       <li><strong>Registered exercises only.</strong> The browser sends only an exercise name. Names that the active guide does not register get <code data-src="docs/onboarding/serve.py" data-ref='"exercise is not registered for this guide"'>a 404</code>. Registered exercises run in <code data-src="docs/onboarding/guidelib.py" data-sym="run_exercise">a constrained subprocess</code>.</li>
     </ol>
 
+    <div data-depth="standard">
     <h3>The token check, in full</h3>
     <p>Every request goes through <code>_route</code> first:</p>
     <figure class="code-listing" data-src="docs/onboarding/serve.py" data-lines="169-178"><pre>    def _route(self):
@@ -129,6 +180,10 @@
       <li>Wrong token: also <code>None</code>. A wrong token looks exactly like a missing page.</li>
       <li>Right token: the rest of the path is routed.</li>
     </ul>
+    </div>
+    <div class="note" data-depth="deep">
+      <p><strong>Deep dive:</strong> the token is compared with <code>hmac.compare_digest</code>, so the time a comparison takes does not reveal how many leading characters were right.</p>
+    </div>
 
     <div class="exercise" data-exercise="path_policy"></div>
 
@@ -192,6 +247,9 @@
       <li>An exercise prints something different from <code>expected/</code>.</li>
     </ol>
     <p>Each one stays failing until the guide or the recording is updated on purpose.</p>
+    <div class="note" data-depth="deep">
+      <p><strong>Deep dive:</strong> listings may leave lines out. <code data-src="docs/onboarding/guidelib.py" data-sym="listing_drift">listing_drift</code> only requires that every line shown appears in the file, in the same order.</p>
+    </div>
 
     <div class="question" data-q="contract-ambiguous" data-answer="b">
       <p class="prompt">A guide anchors on <code>return None</code>, which appears three times in the file, and sets no <code>data-occurrence</code>. What does <code>check.py</code> do?</p>

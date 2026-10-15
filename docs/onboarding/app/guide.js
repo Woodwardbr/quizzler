@@ -42,7 +42,7 @@
   const state = {
     kind: meta.mode, guide: meta.id, version: meta.version, repo: meta.repo,
     pr: meta.pr, head: meta.head,
-    answers: {}, exercises: {}, findings: {}, comments: [], revealed: {}, current: 0,
+    answers: {}, exercises: {}, findings: {}, comments: [], revealed: {}, plan: {}, current: 0,
   };
   let serverMeta = null;
 
@@ -118,7 +118,10 @@
   }
 
   function resultsPayload() {
-    return JSON.parse(JSON.stringify(state));
+    const payload = JSON.parse(JSON.stringify(state));
+    // Report the effective plan (recommendation unless the reader changed it).
+    if (overview) payload.plan = Object.fromEntries(studyModules().map((s) => [s.dataset.module, intensityOf(s.dataset.module)]));
+    return payload;
   }
 
   async function loadSaved() {
@@ -127,7 +130,7 @@
       const data = await api('results');
       const saved = data.results;
       if (saved && saved.guide === meta.id) {
-        for (const key of ['answers', 'exercises', 'findings', 'revealed']) {
+        for (const key of ['answers', 'exercises', 'findings', 'revealed', 'plan']) {
           if (saved[key] && typeof saved[key] === 'object') state[key] = saved[key];
         }
         if (Array.isArray(saved.comments)) state.comments = saved.comments;
@@ -217,23 +220,132 @@
   const moduleNav = el('ol', { class: 'qz-modules' });
   const pager = el('div', { class: 'qz-pager' });
 
+  // ------------------------------------------------------- study plan
+  // An overview module (data-overview) opens the guide with a plan table:
+  // one <tr data-plan="module" data-importance data-complexity
+  // data-intensity> per module. The reader picks an intensity per module:
+  //   skip      the module drops out of navigation and progress
+  //   skim      content marked data-depth="standard" or "deep" is hidden
+  //   standard  content marked data-depth="deep" is hidden
+  //   deep      everything is shown
+  const overview = modules.find((s) => 'overview' in s.dataset) || null;
+  const INTENSITY = [['skip', 'Skip'], ['skim', 'Skim'], ['standard', 'Standard'], ['deep', 'Deep']];
+  const DEPTH_RANK = { skim: 0, standard: 1, deep: 2 };
+  const recommended = {};
+  const studyModules = () => modules.filter((s) => s !== overview);
+  const intensityOf = (id) => state.plan[id] || recommended[id] || 'standard';
+  const isSkipped = (section) => section !== overview && intensityOf(section.dataset.module) === 'skip';
+
+  function buildPlan() {
+    if (!overview) return;
+    const table = overview.querySelector('[data-plan]')?.closest('table') || null;
+    if (table) table.classList.add('qz-plan');
+    const headRow = table && table.querySelector('thead tr');
+    if (headRow) {
+      // Module and description share one column so the plan stays compact
+      // beside the docked code pane.
+      headRow.querySelectorAll('th:not(:first-child)').forEach((th) => th.remove());
+      headRow.append(el('th', { text: 'Importance' }), el('th', { text: 'Complexity' }), el('th', { text: 'Your intensity' }));
+    }
+    overview.querySelectorAll('[data-plan]').forEach((row) => {
+      const id = row.dataset.plan;
+      const section = modules.find((s) => s.dataset.module === id);
+      recommended[id] = row.dataset.intensity || 'standard';
+      const first = row.querySelector('td, th');
+      if (first && section) {
+        const link = el('a', { href: `#${section.id}`, onclick: (e) => { e.preventDefault(); goTo(modules.indexOf(section), true); } });
+        while (first.firstChild) link.append(first.firstChild);
+        first.append(link);
+      }
+      [...row.children].slice(1).forEach((cell) => {
+        if (cell.textContent.trim()) first.append(el('div', { class: 'qz-plan-desc' }, ...cell.childNodes));
+        cell.remove();
+      });
+      const select = el('select', { class: 'qz-intensity', 'aria-label': `Intensity for ${section ? section.dataset.title || id : id}` },
+        INTENSITY.map(([value, label]) => el('option', { value }, label)));
+      select.value = intensityOf(id);
+      select.addEventListener('change', () => {
+        state.plan[id] = select.value;
+        applyPlan();
+        scheduleSave();
+      });
+      const rating = (value) => el('td', {}, el('span', { class: `qz-rating qz-rating-${value || 'none'}` }, value || '–'));
+      const recLabel = (INTENSITY.find(([v]) => v === recommended[id]) || ['', recommended[id]])[1];
+      row.append(rating(row.dataset.importance), rating(row.dataset.complexity),
+        el('td', {}, select, el('div', { class: 'qz-plan-rec', text: `Recommended: ${recLabel}` })));
+    });
+    const start = el('div', { class: 'qz-row qz-plan-actions' },
+      el('button', { class: 'qz-btn', type: 'button', onclick: () => { state.plan = {}; syncPlanSelects(); applyPlan(); scheduleSave(); } }, 'Reset to recommended'),
+      el('button', {
+        class: 'qz-btn qz-primary', type: 'button',
+        onclick: () => { const next = modules.findIndex((s) => s !== overview && !isSkipped(s)); if (next >= 0) goTo(next, true); },
+      }, 'Start the first module →'));
+    (table ? table.closest('.table-wrap') || table : overview.lastElementChild).after(start);
+    // Rows link to modules; the anchor text is the module name.
+  }
+
+  function syncPlanSelects() {
+    overview?.querySelectorAll('[data-plan]').forEach((row) => {
+      const select = row.querySelector('.qz-intensity');
+      if (select) select.value = intensityOf(row.dataset.plan);
+    });
+  }
+
+  function applyPlan() {
+    for (const section of studyModules()) {
+      const intensity = intensityOf(section.dataset.module);
+      section.dataset.intensity = intensity;
+      const rank = DEPTH_RANK[intensity] ?? 1;
+      section.querySelectorAll('[data-depth]').forEach((node) => {
+        node.classList.toggle('qz-depth-hidden', (DEPTH_RANK[node.dataset.depth] ?? 1) > rank);
+      });
+      let banner = section.querySelector(':scope > .qz-skip-banner');
+      if (intensity === 'skip') {
+        if (!banner) {
+          banner = el('div', { class: 'warning qz-skip-banner' },
+            el('p', {}, 'You chose to skip this module. Its questions do not count toward your progress.'),
+            el('button', {
+              class: 'qz-btn', type: 'button',
+              onclick: () => {
+                const id = section.dataset.module;
+                state.plan[id] = recommended[id] && recommended[id] !== 'skip' ? recommended[id] : 'standard';
+                syncPlanSelects(); applyPlan(); scheduleSave();
+              },
+            }, 'Include this module'));
+          section.querySelector('h2')?.after(banner);
+        }
+      } else if (banner) {
+        banner.remove();
+      }
+    }
+    updateModuleNav();
+    if (modules[state.current]) renderPager(state.current);
+  }
+
   function moduleProgress(section) {
-    const questions = [...section.querySelectorAll('[data-q]')].filter((q) => !q.dataset.retired);
+    if (section === overview || isSkipped(section)) return { answered: 0, total: 0 };
+    const questions = [...section.querySelectorAll('[data-q]')]
+      .filter((q) => !q.dataset.retired && !q.closest('.qz-depth-hidden'));
     const answered = questions.filter((q) => state.answers[q.dataset.q]).length;
     return { answered, total: questions.length };
   }
 
   function buildModules() {
+    const total = studyModules().length;
+    let number = 0;
     modules.forEach((section, index) => {
       section.id = section.id || `module-${section.dataset.module}`;
       section.setAttribute('tabindex', '-1');
       const heading = section.querySelector('h2');
-      if (heading) heading.before(el('p', { class: 'qz-eyebrow', text: `Module ${index + 1} of ${modules.length}` }));
+      const isOverview = section === overview;
+      if (!isOverview) number += 1;
+      if (heading) heading.before(el('p', { class: 'qz-eyebrow', text: isOverview ? 'Overview' : `Module ${number} of ${total}` }));
       const label = section.dataset.title || (heading ? heading.textContent : section.dataset.module);
       const link = el('a', {
         href: `#${section.id}`, 'data-index': index,
         onclick: (event) => { event.preventDefault(); goTo(index, true); },
-      }, el('span', { class: 'qz-mod-num' }, String(index + 1)), el('span', { class: 'qz-mod-label' }, label),
+      }, el('span', { class: 'qz-mod-num' }, isOverview ? '★' : String(number)), el('span', { class: 'qz-mod-label' }, label,
+        isOverview ? '' : el('span', { class: 'qz-mod-intensity' })),
       el('span', { class: 'qz-mod-status' }));
       moduleNav.append(el('li', {}, link));
     });
@@ -243,12 +355,38 @@
   function updateModuleNav() {
     moduleNav.querySelectorAll('a').forEach((link) => {
       const index = Number(link.dataset.index);
-      const { answered, total } = moduleProgress(modules[index]);
-      link.querySelector('.qz-mod-status').textContent = total ? `${answered}/${total}` : '';
+      const section = modules[index];
+      const { answered, total } = moduleProgress(section);
+      const skipped = isSkipped(section);
+      link.querySelector('.qz-mod-status').textContent = skipped ? 'skipped' : total ? `${answered}/${total}` : '';
       link.classList.toggle('qz-done', total > 0 && answered === total);
+      link.classList.toggle('qz-skipped', skipped);
+      const tag = link.querySelector('.qz-mod-intensity');
+      if (tag && overview) tag.textContent = skipped ? '' : intensityOf(section.dataset.module);
       if (index === state.current) link.setAttribute('aria-current', 'step');
       else link.removeAttribute('aria-current');
     });
+  }
+
+  // Previous/Next step over skipped modules; the nav can still open them.
+  function neighbour(index, step) {
+    for (let i = index + step; i >= 0 && i < modules.length; i += step) {
+      if (!isSkipped(modules[i])) return i;
+    }
+    return -1;
+  }
+
+  function renderPager(index) {
+    const prev = neighbour(index, -1);
+    const next = neighbour(index, 1);
+    const section = modules[index];
+    const position = section === overview ? 'Overview'
+      : `Module ${studyModules().indexOf(section) + 1} of ${studyModules().length}`;
+    pager.replaceChildren(
+      el('button', { class: 'qz-btn', type: 'button', disabled: prev < 0, onclick: () => goTo(prev, true) }, '← Previous'),
+      el('span', { class: 'qz-pager-pos' }, position),
+      el('button', { class: 'qz-btn qz-primary', type: 'button', disabled: next < 0, onclick: () => goTo(next, true) }, 'Next →'),
+    );
   }
 
   function goTo(index, focus) {
@@ -256,11 +394,7 @@
     index = Math.max(0, Math.min(modules.length - 1, index));
     state.current = index;
     modules.forEach((section, i) => { section.hidden = i !== index; });
-    pager.replaceChildren(
-      el('button', { class: 'qz-btn', type: 'button', disabled: index === 0, onclick: () => goTo(index - 1, true) }, '← Previous'),
-      el('span', { class: 'qz-pager-pos' }, `Module ${index + 1} of ${modules.length}`),
-      el('button', { class: 'qz-btn qz-primary', type: 'button', disabled: index === modules.length - 1, onclick: () => goTo(index + 1, true) }, 'Next →'),
-    );
+    renderPager(index);
     updateModuleNav();
     if (history.replaceState) history.replaceState(null, '', `#${modules[index].id}`);
     if (focus) {
@@ -1101,10 +1235,13 @@
   async function init() {
     buildShell();
     buildModules();
+    buildPlan();
     buildCodePane();
     await loadSaved();
     guideRoot.querySelectorAll('[data-q]').forEach(buildQuestion);
     guideRoot.querySelectorAll('.exercise[data-exercise]').forEach(buildExercise);
+    syncPlanSelects();
+    applyPlan();
     modules.forEach(buildFindings);
     buildListings();
     buildAnchors();
