@@ -167,7 +167,7 @@ The steps:
 
 The engine boxes each `<h3>` sub-section of the final review and the final report into a card, coloured by the h3's class: `got` (green ✓), `missed` (red ✗), `shaky` (amber ~) or `plan` (blue). Headings without a class are coloured by keywords. List items with class `got`, `missed` or `shaky` get matching colours and icons, and `<span class="right-idea">` adds a "Right idea:" line under a miss.
 
-The engine also adds a **Question by question** card: every question in the plan, per module, with your answer against the correct one and a colour-coded result. Until the review is written, the final page shows the scoreboard, this breakdown, and a **Generate review** button that explains the two choices that follow: keep learning, or call it a day.
+Once the review is written, the engine adds a **Question by question** card to it: every question in the plan, per module, with your answer against the correct one and a colour-coded result. Until then, the final page shows only the scoreboard and a **Generate review** button that explains the two choices that follow: keep learning, or call it a day.
 
 ### Repository map (overview)
 
