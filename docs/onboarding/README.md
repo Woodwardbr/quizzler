@@ -182,12 +182,19 @@ Once the review is written, the engine adds a **Question by question** card to i
 
 While the reader is on the overview, the source pane shows a **repository map** instead of code: a folder tree of the repo, built from the files the path policy allows, with file counts.
 
+- **Collapsed to start:** folders start collapsed. Small numbered **module chips** on each folder and file show which modules cover it. A module covers every file it anchors to (`data-src`), plus anything listed in `data-paths="dir/,file"` on its section. Clicking a module in the legend opens the folders that lead to it and highlights its files.
 - **Descriptions:** come from overview elements with `data-area="path/"`, usually rows of the "where things live" table. A folder's description is the row's other cells, or `data-area-desc`. Described folders are highlighted and expanded.
 - **Linked to the table:** hovering or clicking an area row highlights its folder in the map, and clicking a described folder flashes its row.
 - **Opening files:** clicking a file opens it in the pane, with a "← Repository map" button to go back.
 - **Leaving the overview:** the pane goes back to following code.
 
 `check.py` requires that `data-area` paths exist, are visible, and appear only in the overview.
+
+On the **final review** and the **final report**, the pane shows the same map titled "What you know, by location":
+
+- **Module score:** each module is scored from the reader's answers. Mastered counts 1, right but unsure counts 0.6, and a miss counts 0.
+- **File and folder scores:** each file shows the average for the modules covering it, and each folder the average over its contents. They are coloured green (75% and up), amber (40–74%) or red (below 40%), and untested parts are grey.
+- **Legend:** lists each module with its score.
 
 ### Writing style
 
