@@ -159,7 +159,29 @@ class BrowserTest(unittest.TestCase):
         self.assertTrue(self.js("return document.querySelector('.qz-pager .qz-primary').disabled"))
         self.js("[...document.querySelectorAll('.qz-btn')].find(b => b.textContent.startsWith('Export')).click()")
         code = self.wait("document.querySelector('.qz-dialog textarea') && document.querySelector('.qz-dialog textarea').value")
-        self.assertEqual(json.loads(code.split(" ", 1)[1])["plan"], {"m1": "deep", "m2": "skip"})
+        exported = json.loads(code.split(" ", 1)[1])
+        self.assertEqual(exported["plan"], {"m1": "deep", "m2": "skip"})
+        self.assertEqual(exported["pending"], {})
+
+    def test_skeleton_outline_and_pending_notice(self):
+        fx = Fixture()
+        self.addCleanup(fx.cleanup)
+        from support import OVERVIEW
+        overview = OVERVIEW.replace("</tbody>", '<tr data-plan="m2" data-importance="low" data-complexity="low" data-intensity="skim"><td>2</td><td>y</td></tr></tbody>')
+        body = overview + """
+<section class="module" data-module="m1" data-written="skim"><h2>One</h2><p>skim layer</p></section>
+<section class="module" data-module="m2" data-written="skeleton"><h2>Two</h2><ol><li>outline item</li></ol></section>"""
+        fx.write_guide("guide.html", body)
+        app = serve.GuideApp(fx.root, fx.onboard / "guide.html", onboard_dir=fx.onboard)
+        self.serve(app)
+        statuses = "return [...document.querySelectorAll('.qz-mod-status')].map(s => s.textContent)"
+        self.assertEqual(self.js(statuses), ["", "", "outline"])
+        banners = "return [...document.querySelectorAll('.qz-pending-banner')].map(b => b.closest('section').dataset.module)"
+        self.assertEqual(self.js(banners), ["m1", "m2"])  # m1 is written to skim but the plan says standard
+        self.js("const s = document.querySelector('[data-plan=m1] select'); s.value = 'skim'; s.dispatchEvent(new Event('change'))")
+        self.js("const s = document.querySelector('[data-plan=m2] select'); s.value = 'skip'; s.dispatchEvent(new Event('change'))")
+        self.assertEqual(self.js(banners), [])
+        self.assertEqual(self.js(statuses), ["", "", "skipped"])
 
     def test_code_pane_open_by_default_and_follows_scroll(self):
         fx = Fixture()

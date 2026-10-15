@@ -129,9 +129,29 @@ def render_markdown(progress: dict, guide: gl.Guide | None) -> str:
     return "\n".join(lines)
 
 
+def pending_work(guide: gl.Guide, plan: dict) -> list[tuple[str, str, str]]:
+    """(module, written, wanted) for modules whose chosen intensity is deeper
+    than what has been written, in study-plan order. Skipped modules never
+    appear: they stay skeletons."""
+    order = [row.module for row in guide.plan] or [m for m in guide.modules if m != guide.overview]
+    recommended = {row.module: row.intensity for row in guide.plan}
+    todo = []
+    for module in order:
+        wanted = plan.get(module) or recommended.get(module) or "standard"
+        written = guide.written.get(module, "deep")
+        if wanted != "skip" and gl.WRITTEN_RANK.get(written, 3) < gl.WRITTEN_RANK.get(wanted, 2):
+            todo.append((module, written, wanted))
+    return todo
+
+
 def report(directory: Path, guide: gl.Guide | None) -> str:
     progress = _load(directory / "progress.json")
     if not progress.get("history"):
+        if guide is not None and guide.plan:
+            todo = pending_work(guide, {})
+            lines = ["No results recorded yet. With the recommended plan, write next:"]
+            lines += [f"  - {m}: {w} -> {t}" for m, w, t in todo] or ["  (nothing pending)"]
+            return "\n".join(lines)
         return "No results recorded yet. Ingest a result code first."
     entry = progress["history"][-1]
     out = [f"Targets for the next version of {progress.get('guide')} (from v{entry['version']}):", ""]
@@ -143,6 +163,14 @@ def report(directory: Path, guide: gl.Guide | None) -> str:
         for module, intensity in plan.items():
             note = "" if recommended.get(module) in (None, intensity) else f" (recommended {recommended[module]})"
             out.append(f"  - {module}: {intensity}{note}")
+        out.append("")
+    if guide is not None and guide.plan:
+        todo = pending_work(guide, plan)
+        if todo:
+            out.append("Write next, in this order (set data-written when a layer is done; skipped modules stay skeletons):")
+            out += [f"  - {m}: written {w}, reader wants {t}" for m, w, t in todo]
+        else:
+            out.append("Every module the reader kept is written to the chosen depth.")
         out.append("")
     modules: dict[str, list] = {}
     for qid, rec in entry["answers"].items():
@@ -223,30 +251,39 @@ def main(argv=None) -> int:
     parser.add_argument("--guide", type=Path, help="guide the results belong to (default: local/guide.html or guide.html)")
     sub = parser.add_subparsers(dest="command", required=True)
     i = sub.add_parser("ingest")
-    i.add_argument("code", help="result code, or - for stdin")
+    i.add_argument("code", nargs="?", default=None,
+                   help="result code, or - for stdin (default: the server's autosaved results file)")
     sub.add_parser("report")
     sub.add_parser("bump")
     args = parser.parse_args(argv)
 
     guide_path = (args.guide or default_guide()).resolve()
     guide = gl.load_guide(guide_path)
-    directory = progress_dir_for(guide_path, guide.guide_id)
+    local_dir = gl.local_dir_for(guide_path)
+    directory = progress_dir_for(guide_path, guide.guide_id, local_dir)
     if args.command == "ingest":
-        code = sys.stdin.read() if args.code == "-" else args.code
+        if args.code is None:
+            saved = gl.results_path_for(guide_path, guide.guide_id, local_dir)
+            if not saved.is_file():
+                raise SystemExit(f"no autosaved results at {saved}; paste the exported result code instead")
+            code = "QUIZZLER-ONBOARD " + saved.read_text(encoding="utf-8")
+        else:
+            code = sys.stdin.read() if args.code == "-" else args.code
         kind, payload = gl.parse_result_code(code)
         if kind != "onboard":
             raise SystemExit("this is a review result code; use review.py ingest N")
         if payload.get("guide") != guide.guide_id:
             raise SystemExit(f"result code is for guide {payload.get('guide')!r}, not {guide.guide_id!r}; pass --guide")
         directory.mkdir(parents=True, exist_ok=True)
-        gl.write_json(gl.results_path_for(guide_path, guide.guide_id), payload)
+        if args.code is not None:
+            gl.write_json(gl.results_path_for(guide_path, guide.guide_id, local_dir), payload)
         record = record_results(directory, payload, guide)
         print(json.dumps(record["summary"], indent=2))
         print(f"Recorded in {directory / 'progress.md'}")
     elif args.command == "report":
         print(report(directory, guide))
     elif args.command == "bump":
-        print(json.dumps(bump(guide_path, directory), indent=2))
+        print(json.dumps(bump(guide_path, directory, local_dir), indent=2))
     return 0
 
 

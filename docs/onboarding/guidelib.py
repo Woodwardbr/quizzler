@@ -34,6 +34,10 @@ COMMENT_STATES = ("ready", "needs-another-look", "not-posting")
 RATINGS = ("low", "medium", "high")
 INTENSITIES = ("skip", "skim", "standard", "deep")
 DEPTHS = ("standard", "deep")  # data-depth: shown at this intensity and above
+# data-written on a module: how far it has been written. Missing means "deep"
+# (fully written). A skeleton is an outline with no questions or exercises.
+WRITTEN_LEVELS = ("skeleton", "skim", "standard", "deep")
+WRITTEN_RANK = {level: rank for rank, level in enumerate(WRITTEN_LEVELS)}
 RESULT_PREFIXES = {"QUIZZLER-ONBOARD": "onboard", "QUIZZLER-REVIEW": "review"}
 PREVIEW_PREFIX = "QUIZZLER-PREVIEW"
 
@@ -381,7 +385,9 @@ class Guide:
     listings: list[Listing] = field(default_factory=list)
     plan: list[PlanRow] = field(default_factory=list)
     overview: str | None = None
-    depths: list[tuple[str, int]] = field(default_factory=list)
+    depths: list[tuple[str, int, str | None]] = field(default_factory=list)
+    written: dict = field(default_factory=dict)
+    exercise_modules: list[tuple[str, str | None]] = field(default_factory=list)
     assets: list[str] = field(default_factory=list)
     inline_scripts: list[int] = field(default_factory=list)
     has_main: bool = False
@@ -443,6 +449,7 @@ class _GuideParser(html.parser.HTMLParser):
             frame["module"] = a["data-module"]
             if "data-overview" in a:
                 g.overview = a["data-module"]
+            g.written[a["data-module"]] = a.get("data-written", "deep")
             g.modules.append(a["data-module"])
             g.module_titles[a["data-module"]] = a.get("data-title", a["data-module"])
         module = frame.get("module") or self._ctx("module")
@@ -468,9 +475,10 @@ class _GuideParser(html.parser.HTMLParser):
             g.plan.append(PlanRow(a["data-plan"], a.get("data-importance", ""), a.get("data-complexity", ""),
                                   a.get("data-intensity", ""), line))
         if "data-depth" in a:
-            g.depths.append((a["data-depth"], line))
+            g.depths.append((a["data-depth"], line, module))
         if "data-exercise" in a:
             g.exercises.append(a["data-exercise"])
+            g.exercise_modules.append((a["data-exercise"], module))
             frame["exercise"] = a["data-exercise"]
         if tag == "figure" and "code-listing" in classes:
             listing = Listing(a.get("data-src"), a.get("data-lines"), self._ctx("exercise"), [], line)
@@ -880,6 +888,14 @@ def write_json(path: Path, data) -> None:
     tmp = path.with_suffix(path.suffix + ".tmp")
     tmp.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     os.replace(tmp, path)
+
+
+def local_dir_for(guide_path: Path) -> Path:
+    """The local/ state directory belonging to the onboarding dir a guide lives in."""
+    for parent in Path(guide_path).resolve().parents:
+        if (parent / "app" / "guide.js").is_file():
+            return parent / "local"
+    return LOCAL_DIR
 
 
 def results_path_for(guide_path: Path, guide_id: str, local_dir: Path = LOCAL_DIR) -> Path:
