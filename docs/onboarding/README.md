@@ -137,7 +137,7 @@ The engine adds importance and complexity badges and an intensity dropdown to ea
 Modules are **written on demand**. `data-written="skeleton|skim|standard|deep"` on a module records how far it has been written. A missing attribute means fully written.
 
 1. `/onboard` writes the overview and a skeleton of every module: what it covers, an outline, and the key code anchors. A skeleton has no questions or exercises.
-2. The reader sets intensities and presses **Generate modules** under the plan. Claude writes every pending module in one go, in plan order and only to the chosen depth, and leaves skipped modules as skeletons. Opening a module never triggers writing.
+2. The reader sets intensities and presses the large **Generate modules** button at the end of the overview. Claude writes every pending module in one go, in plan order and only to the chosen depth, and leaves skipped modules as skeletons. Opening a module never triggers writing.
 3. Skeletons show as "outline" in the sidebar. A module whose chosen intensity is deeper than what has been written shows a "not written yet" notice.
 4. The gap is exported as `pending` and listed by `progress.py report` under "Write next".
 5. `check.py` rejects questions or exercises in skeletons, and `data-depth` content deeper than `data-written`.

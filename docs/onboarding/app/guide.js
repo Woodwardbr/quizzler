@@ -322,26 +322,30 @@
     (table ? table.closest('.table-wrap') || table : overview.lastElementChild).after(start);
   }
 
-  // Below the plan: Generate modules (when any module is not written to the
-  // chosen depth) and Start. Re-rendered whenever the plan or work changes.
+  // Under the plan table: Reset. At the very end of the overview: one big
+  // Generate modules button. Unwritten modules stay outlines until it is
+  // pressed; nothing else writes them.
   function renderPlanActions() {
     const box = overview?.querySelector('.qz-plan-actions');
     if (!box) return;
+    box.replaceChildren(el('div', { class: 'qz-row' },
+      el('button', { class: 'qz-btn', type: 'button', onclick: () => { state.plan = {}; syncPlanSelects(); applyPlan(); scheduleSave(); } }, 'Reset to recommended')));
+    let gen = overview.querySelector(':scope > .qz-generate');
+    if (!gen) {
+      gen = el('div', { class: 'qz-generate' });
+      overview.append(gen);
+    }
     const pending = Object.keys(pendingModules());
     const generating = work.has('write-modules');
-    const first = modules.findIndex((s) => !isSpecial(s) && !isSkipped(s));
-    box.replaceChildren(
-      pending.length || generating ? el('p', {}, generating
-        ? 'Claude is writing your modules. The page reloads when they are ready.'
-        : `${pending.length} module${pending.length === 1 ? ' is' : 's are'} not written at your chosen intensity yet. Set your plan, then generate them in one go.`) : '',
-      el('div', { class: 'qz-row' },
-        el('button', { class: 'qz-btn', type: 'button', onclick: () => { state.plan = {}; syncPlanSelects(); applyPlan(); scheduleSave(); } }, 'Reset to recommended'),
-        pending.length && hasServer ? el('button', { class: 'qz-btn qz-primary', type: 'button', disabled: generating, onclick: generateModules },
-          generating ? 'Generating…' : `Generate modules (${pending.length})`) : '',
-        el('button', {
-          class: `qz-btn${pending.length && hasServer ? '' : ' qz-primary'}`, type: 'button', disabled: first < 0,
-          onclick: () => goTo(first, true),
-        }, 'Start the first module →')));
+    if (!pending.length && !generating) { gen.replaceChildren(); gen.hidden = true; return; }
+    gen.hidden = false;
+    gen.replaceChildren(
+      el('button', {
+        class: 'qz-btn qz-primary qz-btn-big', type: 'button', disabled: generating || !hasServer, onclick: generateModules,
+      }, generating ? 'Generating modules…' : 'Generate modules'),
+      el('p', { class: 'qz-dim', text: !hasServer ? 'Generating needs the local guide server (serve.py).'
+        : generating ? 'Claude is writing them now. This page reloads when they are ready.'
+          : `Writes ${pending.length} module${pending.length === 1 ? '' : 's'} at the intensities in your plan. Skipped modules stay as outlines.` }));
   }
 
   // ------------------------------------------------------- final review
@@ -582,7 +586,7 @@
         if (section !== overview) section.classList.add('qz-generating');
         const anchor = section.querySelector(':scope > h2') || section.querySelector(':scope > .qz-eyebrow') || section.firstElementChild;
         const panel = workPanel(item, section);
-        if (section === overview && section.querySelector('.qz-plan-actions')) section.querySelector('.qz-plan-actions').after(panel);
+        if (section === overview && section.querySelector(':scope > .qz-generate')) section.querySelector(':scope > .qz-generate').before(panel);
         else if (anchor) anchor.after(panel); else section.prepend(panel);
       }
     }

@@ -139,7 +139,8 @@ Continue when the arguments contain a `QUIZZLER-ONBOARD {...}` result code, when
    - A diagram of the whole system: the major components and how data or control flows between them.
    - A "where things live" table mapping directories or files to responsibilities, with anchors on the key entry points.
    - The study plan table. Its header row is `<th>Module</th><th>What you will learn</th>`, and it has one row per later module: `<tr data-plan="<module id>" data-importance="…" data-complexity="…" data-intensity="…"><td>Title</td><td>One line</td></tr>`. The engine adds the rating badges and a dropdown the reader uses to change the intensity or skip the module.
-   - A short list explaining the four intensities, and a note that modules are written after the reader sets the plan.
+   - A short list explaining the four intensities. Make it the last thing in the overview; the engine puts a large **Generate modules** button after it.
+   - Don't describe how or when modules get written (no "say continue", "written on demand" or "start the first module" text). The button says it all, and unwritten modules simply stay outlines.
 
    **Every later module starts as a skeleton,** `<section class="module" data-module="…" data-title="…" data-written="skeleton">`. It contains no questions and no exercises, only:
    - The `<h2>` title.

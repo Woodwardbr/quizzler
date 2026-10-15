@@ -508,7 +508,7 @@ main[data-guide] table.qz-plan td { vertical-align: middle; }
 .qz-plan td:first-child a { font-weight: 600; }
 .qz-plan-desc { color: var(--muted); font-size: 0.9em; margin-top: 0.15rem; }
 .qz-plan-rec { color: var(--muted); font-size: 0.75rem; margin-top: 0.2rem; white-space: nowrap; }
-.qz-plan-actions { justify-content: flex-end; margin-bottom: 1.5rem; }
+.qz-plan-actions .qz-row { justify-content: flex-end; margin-bottom: 1.5rem; }
 .qz-mod-intensity {
   display: block; font-size: 0.7rem; font-weight: 400; color: var(--muted);
   text-transform: uppercase; letter-spacing: 0.05em;
@@ -584,3 +584,10 @@ section.qz-generating > :not(.qz-work):not(h2):not(.qz-eyebrow) { animation: qz-
 .qz-choice-card h4 { margin: 0; font-size: 1.05rem; }
 .qz-choice-card p { margin: 0; flex: 1; color: var(--muted); }
 .qz-choice-card .qz-btn { align-self: flex-start; }
+
+.qz-generate {
+  margin: 2rem 0 0.5rem; padding: 1.25rem; text-align: center;
+  border: 1px solid var(--accent); border-radius: var(--radius); background: var(--accent-soft);
+}
+.qz-btn-big { font-size: 1.15rem; padding: 0.75rem 2rem; border-radius: 8px; }
+.qz-generate p { margin: 0.6rem 0 0; }

@@ -76,7 +76,7 @@ class BrowserTest(unittest.TestCase):
         self.serve(app)
         self.assertEqual(self.js("return [...document.querySelectorAll('.qz-mod-label')].map(l => l.firstChild.textContent)"),
                          ["Overview", "Module one", "Final review"])
-        self.js("[...document.querySelectorAll('.qz-plan-actions button')].find(b => b.textContent.startsWith('Start')).click()")
+        self.js("document.querySelectorAll('.qz-modules a')[1].click()")
         self.wait("!document.getElementById('module-m1').hidden")
 
         self.answer("q1", "b", "sure")
@@ -203,14 +203,18 @@ class BrowserTest(unittest.TestCase):
         app = serve.GuideApp(fx.root, guide, onboard_dir=fx.onboard)
         self.serve(app)
         # Opening a module never asks Claude for anything.
-        self.js("[...document.querySelectorAll('.qz-plan-actions button')].find(b => b.textContent.startsWith('Start')).click()")
+        self.assertFalse(self.js("return [...document.querySelectorAll('button')].some(b => b.textContent.startsWith('Start the first'))"))
+        self.js("document.querySelectorAll('.qz-modules a')[1].click()")
         self.wait("!document.getElementById('module-m1').hidden")
         time.sleep(0.5)
         self.assertEqual(gl.update_requests(app.requests_path), [])
         self.assertIn("Go to the overview to generate modules", self.js("return document.querySelector('#module-m1 .qz-pending-banner').textContent"))
         # Generate modules asks for every pending module at its chosen depth, in one request.
         self.js("document.querySelectorAll('.qz-modules a')[0].click()")
-        self.js("[...document.querySelectorAll('.qz-plan-actions button')].find(b => b.textContent.startsWith('Generate modules')).click()")
+        # The big button is the last thing in the overview.
+        self.assertTrue(self.js("return document.getElementById('module-overview').lastElementChild.classList.contains('qz-generate')"))
+        self.assertIn("Writes 2 modules", self.js("return document.querySelector('.qz-generate').textContent"))
+        self.js("document.querySelector('.qz-generate button').click()")
         self.wait("document.querySelector('#module-overview .qz-work') && document.querySelector('#module-m2 .qz-work')")
         statuses = self.js("return [...document.querySelectorAll('.qz-mod-status')].map(s => s.textContent)")
         self.assertEqual(statuses[1:3], ["writing…", "writing…"])
