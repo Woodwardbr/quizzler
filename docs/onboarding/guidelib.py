@@ -328,6 +328,7 @@ class SourceRef:
     lines: str | None
     line: int  # line in the guide file, for error messages
     kind: str  # "ref", "sym", "finding", "lines", "path"
+    keys: tuple[str, ...] = ()  # data-key literals: key lines within the anchored range
 
 
 @dataclass
@@ -371,6 +372,7 @@ class Listing:
     exercise: str | None
     code: list[str]
     line: int
+    keys: tuple[str, ...] = ()
 
 
 @dataclass
@@ -507,7 +509,8 @@ class _GuideParser(html.parser.HTMLParser):
             g.exercise_modules.append((a["data-exercise"], module))
             frame["exercise"] = a["data-exercise"]
         if tag == "figure" and "code-listing" in classes:
-            listing = Listing(a.get("data-src"), a.get("data-lines"), self._ctx("exercise"), [], line)
+            listing = Listing(a.get("data-src"), a.get("data-lines"), self._ctx("exercise"), [], line,
+                              tuple(k.strip() for k in a.get("data-key", "").split("|") if k.strip()))
             g.listings.append(listing)
             frame["listing"] = listing
         listing = self._ctx("listing")
@@ -535,6 +538,7 @@ class _GuideParser(html.parser.HTMLParser):
                 a["data-src"], a.get("data-ref"), a.get("data-sym"),
                 int(occurrence) if occurrence and occurrence.isdigit() else None,
                 a.get("data-lines"), line, kind,
+                tuple(k.strip() for k in a.get("data-key", "").split("|") if k.strip()),
             ))
         if not closed:
             self.stack.append(frame)

@@ -18,6 +18,16 @@
   --hl: #fff4bf;
   --add: #e3f5e6;
   --del: #fbe9e7;
+  --tk-kw: #8b1f9e;
+  --tk-str: #0b6e3c;
+  --tk-com: #6b7280;
+  --tk-num: #a34a00;
+  --tk-def: #1d4fd8;
+  --tk-call: #24508f;
+  --tk-type: #8a3f00;
+  --tk-const: #b4235a;
+  --tk-dec: #7a5a00;
+  --focus-bg: #dce7ff;
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
   --sans: system-ui, -apple-system, "Segoe UI", Roboto, Ubuntu, sans-serif;
   --radius: 8px;
@@ -47,6 +57,16 @@
     --hl: #4a4119;
     --add: #183a22;
     --del: #43201d;
+    --tk-kw: #d29cf5;
+    --tk-str: #8fd9a8;
+    --tk-com: #8a919c;
+    --tk-num: #f2b37a;
+    --tk-def: #8fb6ff;
+    --tk-call: #9fc3ff;
+    --tk-type: #f0c27a;
+    --tk-const: #ff9cb8;
+    --tk-dec: #e6cf73;
+    --focus-bg: #263a63;
     color-scheme: dark;
   }
 }
@@ -70,6 +90,16 @@
   --hl: #4a4119;
   --add: #183a22;
   --del: #43201d;
+  --tk-kw: #d29cf5;
+  --tk-str: #8fd9a8;
+  --tk-com: #8a919c;
+  --tk-num: #f2b37a;
+  --tk-def: #8fb6ff;
+  --tk-call: #9fc3ff;
+  --tk-type: #f0c27a;
+  --tk-const: #ff9cb8;
+  --tk-dec: #e6cf73;
+  --focus-bg: #263a63;
   color-scheme: dark;
 }
 
@@ -398,7 +428,16 @@ select { font: inherit; font-size: 0.9rem; padding: 0.3rem; border-radius: 6px; 
 }
 .qz-line.qz-added { background: var(--add); }
 .qz-line.qz-added .qz-ln { box-shadow: inset 3px 0 0 var(--ok); }
-.qz-line.qz-hl { background: var(--hl); }
+/* The anchored range: a faint tint and a margin bar, not a solid block. */
+.qz-line.qz-hl { background: color-mix(in srgb, var(--accent-soft) 45%, transparent); }
+.qz-line.qz-hl .qz-ln { box-shadow: inset -3px 0 0 color-mix(in srgb, var(--accent) 55%, transparent); color: var(--text); }
+.qz-line.qz-hl-first { border-top: 1px solid color-mix(in srgb, var(--accent) 35%, transparent); }
+.qz-line.qz-hl-last { border-bottom: 1px solid color-mix(in srgb, var(--accent) 35%, transparent); }
+/* Key lines for the concept: named with data-key, or lines using its identifiers. */
+.qz-line.qz-key { background: color-mix(in srgb, var(--hl) 85%, transparent); }
+.qz-line.qz-key-soft { background: color-mix(in srgb, var(--hl) 40%, transparent); }
+.qz-line.qz-key .qz-ln::before, .qz-line.qz-key-soft .qz-ln::before { content: "▸ "; color: var(--warn); }
+.code-listing .l.qz-key { background: color-mix(in srgb, var(--hl) 85%, transparent); }
 .qz-line.qz-sel { background: var(--accent-soft); }
 .qz-code-body .qz-row { padding: 0 0.9rem; }
 
@@ -493,7 +532,7 @@ select { font: inherit; font-size: 0.9rem; padding: 0.3rem; border-radius: 6px; 
 .code-listing pre code { display: block; background: none; padding: 0; white-space: pre; }
 .code-listing .l { display: block; padding: 0 1rem 0 0; }
 .code-listing .l::before { counter-increment: ln; content: counter(ln); display: inline-block; width: 2.6rem; padding-right: 0.8rem; text-align: right; color: var(--muted); user-select: none; }
-.code-listing .l.out { background: var(--hl); }
+.code-listing .l.out { background: color-mix(in srgb, var(--hl) 55%, transparent); box-shadow: inset 3px 0 0 var(--warn); }
 
 .qz-step { display: flex; align-items: center; gap: 0.5rem; margin: 1.1rem 0 0.4rem; font-size: 0.95rem; }
 .qz-step-n { display: inline-grid; place-items: center; width: 1.5rem; height: 1.5rem; border-radius: 50%; background: var(--accent-soft); font-size: 0.8rem; font-weight: 700; }
@@ -707,3 +746,35 @@ main[data-guide] li.shaky::before { content: "~"; color: var(--warn); }
 /* Scrollbars follow the chosen theme, not just the system one. */
 html { scrollbar-color: var(--border) var(--bg); }
 .qz-side, .qz-code-body, .qz-table-scroll, .table-wrap, .diagram-scroll { scrollbar-color: var(--border) transparent; }
+
+/* Syntax colours (source pane, listings, exercises) */
+.tk-kw { color: var(--tk-kw); font-weight: 600; }
+.tk-str { color: var(--tk-str); }
+.tk-com { color: var(--tk-com); font-style: italic; }
+.tk-num { color: var(--tk-num); }
+.tk-def { color: var(--tk-def); font-weight: 700; }
+.tk-call { color: var(--tk-call); }
+.tk-type { color: var(--tk-type); }
+.tk-const { color: var(--tk-const); }
+.tk-dec { color: var(--tk-dec); }
+.tk-op { color: var(--muted); }
+.qz-lines code, .code-listing pre { tab-size: 4; }
+.qz-lines { line-height: 1.6; font-size: 0.82rem; }
+
+/* Identifiers that matter for the current concept */
+.tk-focus {
+  background: var(--focus-bg); border-radius: 3px; padding: 0 1px;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+.tk-flash { outline: 2px solid var(--accent); outline-offset: 1px; animation: qz-pulse 0.6s ease-in-out 2; }
+.qz-focus-strip {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem;
+  padding: 0.45rem 0.9rem; border-bottom: 1px solid var(--border); background: var(--surface-2);
+}
+.qz-focus-label { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-right: 0.2rem; }
+.qz-focus-chip {
+  font: inherit; font-family: var(--mono); font-size: 0.78rem; cursor: pointer;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent); background: var(--focus-bg); color: var(--text);
+  border-radius: 999px; padding: 0.1rem 0.55rem;
+}
+.qz-focus-chip:hover { border-color: var(--accent); }

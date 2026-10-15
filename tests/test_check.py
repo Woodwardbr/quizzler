@@ -182,6 +182,22 @@ class DriftGateTest(unittest.TestCase):
         self.assertIn("data-area belongs in the overview", errors)
         self.assertEqual(len(report.errors), 3)
 
+    def test_data_key_must_be_in_anchored_range(self):
+        body = """
+<section class="module" data-module="m1"><h2>1</h2>
+  <code data-src="src/app.py" data-sym="Service.run" data-key='return "ok"'>ok</code>
+  <code data-src="src/app.py" data-sym="Service.run" data-key="return request">wrong range</code>
+  <code data-src="src/app.py" data-lines="4-5" data-key="def handler">ok</code>
+  <figure class="code-listing" data-src="src/app.py" data-lines="4-5" data-key="nope"><pre>def handler(request):
+    return request</pre></figure>
+</section>"""
+        self.fx.write_guide("k.html", body, mode="review", extra=' data-pr="1" data-head-sha="' + "0" * 40 + '"')
+        report = check.Report()
+        check.check_guide(self.fx.onboard / "k.html", self.fx.root, report, onboard_dir=self.fx.onboard)
+        self.assertEqual(len(report.errors), 2, report.errors)
+        self.assertIn("data-key 'return request' is not in the anchored lines 9-10", report.errors[0])
+        self.assertIn("data-key 'nope' is not in the listing", report.errors[1])
+
     def test_review_guide_needs_sha(self):
         self.fx.write_guide("r.html", DEFAULT_BODY, mode="review")
         report = check.Report()

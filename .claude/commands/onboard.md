@@ -20,6 +20,8 @@ Readers skim, so structure every module for skimming:
    - Show any code longer than one line as `<figure class="code-listing" data-src="path" data-lines="A-B"><pre>…</pre></figure>`, copied exactly. `check.py` verifies it against the file, and the caption gets a "Show in file" button.
    - Never put code in a paragraph.
 6. **Anchor anything the reader might want to see.** The code pane is open by default on wide screens and follows the anchor the reader is looking at. Without anchors it has nothing to show.
+   - When an anchor covers more than a few lines (a whole function, a `data-lines` range, a listing), add `data-key="literal|literal"` naming the 1–3 lines that carry the concept. Those lines are marked ▸ and tinted, and the rest of the range stays faint. `check.py` verifies each literal is inside the anchored range.
+   - Mention the variables that matter in `<code>` in the same sentence or bullet as the anchor (or list them in `data-vars="a,b"`). The pane highlights them in the code and offers "Look for" chips.
 7. **Don't hand-copy exercise code.** The engine shows it from the file as step 1 ("Read the code"). Put setup boilerplate above a `# --- exercise ---` line to hide it.
 8. **Use asides sparingly.** `<p class="note">` holds a short aside and `<div class="warning">` holds a trap or gotcha.
 

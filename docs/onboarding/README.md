@@ -163,6 +163,15 @@ The steps:
 4. The session writes the content, runs `relay.py done <ids>`, and starts waiting again.
 5. The page reloads **once, when the request is done**, so it never shows a half-written guide. If you're typing, it offers a reload button instead.
 
+### Source pane: colours, key lines and focus variables
+
+- **Syntax colours:** the pane, code listings and exercise code are coloured by a small built-in tokenizer covering Python, JS/TS, C-like languages, shell/YAML/TOML, SQL, CSS, JSON and HTML. It handles keywords, strings, comments, numbers, definitions, calls, types, constants and decorators.
+- **Anchored range:** shown faintly, with a margin bar.
+- **Key lines:** `data-key="literal|literal"` on an anchor or listing marks the lines containing those literals with ▸ and a stronger tint. Without `data-key`, lines in a multi-line range that use the concept's identifiers get a lighter mark.
+- **Focus identifiers:** these are the inline `<code>` names in the same sentence or bullet as the anchor, the symbol's own name, and any `data-vars`. They're highlighted in the code and listed as **Look for** chips; clicking a chip steps through its occurrences.
+- **Clicking an anchor pins the pane** until you scroll a good way on. After that, auto-follow resumes.
+- `check.py` fails if a `data-key` literal isn't inside the anchored range or listing.
+
 ### Final review and report styling
 
 The engine boxes each `<h3>` sub-section of the final review and the final report into a card, coloured by the h3's class: `got` (green ✓), `missed` (red ✗), `shaky` (amber ~) or `plan` (blue). Headings without a class are coloured by keywords. List items with class `got`, `missed` or `shaky` get matching colours and icons, and `<span class="right-idea">` adds a "Right idea:" line under a miss.

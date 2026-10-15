@@ -387,6 +387,59 @@ class BrowserTest(unittest.TestCase):
         self.wait("document.documentElement.classList.contains('qz-ready')")
         self.assertEqual(self.js("return document.documentElement.dataset.theme"), other)
 
+    def test_code_pane_colours_and_concept_focus(self):
+        fx = Fixture()
+        self.addCleanup(fx.cleanup)
+        fx.write("src/svc.py", "\n".join([
+            "import os",
+            "",
+            "",
+            "def fetch(url, retries=3):",
+            '    """Fetch with retries."""',
+            "    attempt = 0",
+            "    while attempt < retries:",
+            "        attempt += 1",
+            "        if os.environ.get('OFFLINE'):",
+            "            return None  # give up quietly",
+            "    return url",
+            ""]))
+        body = """
+<section class="module" data-module="m1"><h2>One</h2>
+  <ul><li><code data-src="src/svc.py" data-sym="fetch" data-key="while attempt &lt; retries:">fetch</code> loops while
+    <code>attempt</code> is below <code>retries</code>.</li></ul>
+  <figure class="code-listing" data-src="src/svc.py" data-lines="4-6" data-key="attempt = 0"><pre>def fetch(url, retries=3):
+    \"\"\"Fetch with retries.\"\"\"
+    attempt = 0</pre></figure>
+</section>"""
+        fx.write_guide("guide.html", body, mode="review", extra=' data-pr="1" data-head-sha="' + "0" * 40 + '"')
+        app = serve.GuideApp(fx.root, fx.onboard / "guide.html", onboard_dir=fx.onboard)
+        self.serve(app)
+        self.js("document.querySelector('code[data-sym]').click()")
+        self.wait("document.querySelector('.qz-line[data-line=\"4\"] .tk-kw')")
+        line = lambda n, sel: self.js(f"return [...document.querySelectorAll('.qz-line[data-line=\"{n}\"] {sel}')].map(e => e.textContent)")
+        # Syntax colours.
+        self.assertEqual(line(4, ".tk-kw"), ["def"])
+        self.assertEqual(line(4, ".tk-def"), ["fetch"])
+        self.assertEqual(line(4, ".tk-num"), ["3"])
+        self.assertEqual(line(5, ".tk-str"), ['"""Fetch with retries."""'])
+        self.assertEqual(line(10, ".tk-com"), ["# give up quietly"])
+        self.assertEqual(line(10, ".tk-const"), ["None"])
+        # The whole function is the range, but only key lines are strong.
+        classes = self.js("return Object.fromEntries([...document.querySelectorAll('.qz-line')].map(l => [l.dataset.line, l.className]))")
+        self.assertIn("qz-hl", classes["8"])
+        self.assertIn("qz-key", classes["7"].split())
+        self.assertNotIn("qz-key", classes["8"].split())
+        self.assertNotIn("qz-hl", classes["2"])
+        # Concept identifiers from the sentence are marked and listed as chips.
+        self.assertEqual(self.js("return [...document.querySelectorAll('.qz-focus-chip')].map(c => c.textContent)"),
+                         ["fetch", "attempt", "retries"])
+        self.assertGreaterEqual(len(line(8, ".tk-focus")), 1)
+        self.js("[...document.querySelectorAll('.qz-focus-chip')].find(c => c.textContent === 'retries').click()")
+        self.assertEqual(self.js("return document.querySelector('.tk-flash').textContent"), "retries")
+        # Listings in the guide get the same colours and key lines.
+        self.assertEqual(self.js("return document.querySelector('.code-listing .tk-kw').textContent"), "def")
+        self.assertTrue(self.js("return [...document.querySelectorAll('.code-listing .l')][2].classList.contains('qz-key')"))
+
     def test_code_pane_open_by_default_and_follows_scroll(self):
         fx = Fixture()
         self.addCleanup(fx.cleanup)
