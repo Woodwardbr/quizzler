@@ -1,4 +1,4 @@
-# Quizzler
+# The Quizzler
 
 Quizzler is an interactive guide engine for learning a codebase and reviewing pull requests with Claude Code.
 
