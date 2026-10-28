@@ -112,7 +112,7 @@ class ClassifyTest(unittest.TestCase):
         kind, payload = gl.parse_result_code('QUIZZLER-ONBOARD {"guide": "x"}')
         self.assertEqual((kind, payload), ("onboard", {"guide": "x"}))
         with self.assertRaises(ValueError):
-            gl.parse_result_code("AIFM-ONBOARD {}")
+            gl.parse_result_code("OTHER-ONBOARD {}")
         with self.assertRaises(ValueError):
             gl.parse_result_code("QUIZZLER-REVIEW [1]")
 

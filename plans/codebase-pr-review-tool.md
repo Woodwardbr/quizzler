@@ -23,7 +23,7 @@ docs/onboarding/
   app/guide.js              # guide navigation, quiz, code pane, findings
   app/guide.css             # responsive layout and diagrams
   serve.py                  # tokenized loopback server and exercise runner
-  aifm_guide.html           # shared onboarding guide, if project-specific
+  guide.html                # shared onboarding guide, if project-specific
   exercises/
   expected/
   local/                    # gitignored user and PR artifacts
@@ -37,7 +37,7 @@ docs/onboarding/
       results.json
 ```
 
-The reference's `aifm_guide.html` should be renamed or replaced with a repository-neutral onboarding entry point when this is implemented in another codebase. Generated review guides and all learner-specific state belong below `local/`.
+Generated review guides and all learner-specific state belong below `local/`.
 
 ## Architecture
 
@@ -72,12 +72,12 @@ Exercises are deterministic, seeded, CPU-only scripts with a `PREDICT` docstring
 4. Generate one module at a time. Each module includes context, diagrams, source and diff anchors, learning questions, exercises where useful, and proposed findings with evidence.
 5. Serve the module guide and collect its results before generating/revealing the next module's findings. Classify answers as misconception (wrong + sure), gap (wrong + guessed), fragile (right + unsure), or mastered (right + sure); use classifications to adapt explanations and retire already graded questions in later versions.
 6. Let the reviewer record independent comments as well as respond to proposed findings. Preserve confidence and reasoning with each response.
-7. Aggregate findings in a final review view with ready, needs-another-look, and not-posting states. Preview the exact file and line range against the recorded head SHA and assemble one `AIFM-PREVIEW {json}` payload.
+7. Aggregate findings in a final review view with ready, needs-another-look, and not-posting states. Preview the exact file and line range against the recorded head SHA and assemble one `QUIZZLER-PREVIEW {json}` payload.
 8. Posting is a separate explicit action. Before any GitHub write, show the exact comment text and target, then require an unambiguous user instruction to post. Never infer posting permission from completing the review.
 
 ### Onboarding workflow
 
-`/onboard` inventories the repository, identifies major entry points and data/control paths, and generates or opens a guide organized around those paths. Users read a module, predict exercise output, run the exercise, and answer a confidence-rated quiz. An `AIFM-ONBOARD {json}` result updates local progress and informs the next guide revision.
+`/onboard` inventories the repository, identifies major entry points and data/control paths, and generates or opens a guide organized around those paths. Users read a module, predict exercise output, run the exercise, and answer a confidence-rated quiz. An `QUIZZLER-ONBOARD {json}` result updates local progress and informs the next guide revision.
 
 ## Implementation phases
 
