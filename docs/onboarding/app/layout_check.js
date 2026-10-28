@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /* Layout probe loaded by guide.js when the URL has ?layoutcheck=1.
  * Shows every module, measures the rendered page, and writes a JSON report
  * into <pre id="layout-check-result"> for check_layout.py to read.

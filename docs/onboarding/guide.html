@@ -168,7 +168,7 @@
     <div data-depth="standard">
     <h3>The token check, in full</h3>
     <p>Every request goes through <code>_route</code> first:</p>
-    <figure class="code-listing" data-src="docs/onboarding/serve.py" data-lines="184-193"><pre>    def _route(self):
+    <figure class="code-listing" data-src="docs/onboarding/serve.py" data-lines="185-194"><pre>    def _route(self):
         """Return (rest_of_path, query) for token-scoped routes, or None."""
         parts = urlsplit(self.path)
         raw = parts.path

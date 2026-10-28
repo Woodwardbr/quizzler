@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: Apache-2.0
 """Hand button presses in the guide to the Claude session.
 
     relay.py wait   [--guide G | --review N] [--timeout SECONDS]

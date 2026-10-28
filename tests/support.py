@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Shared fixtures: a throwaway repository with its own docs/onboarding copy."""
 
 from __future__ import annotations

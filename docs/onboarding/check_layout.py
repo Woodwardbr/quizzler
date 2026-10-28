@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: Apache-2.0
 """Layout gate: render guides in a headless browser and report broken layouts.
 
     python docs/onboarding/check_layout.py                  # tracked guides
