@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Shared helpers for the Quizzler guide engine.
 
 Everything here is standard-library only so the server, the CI checks, and the

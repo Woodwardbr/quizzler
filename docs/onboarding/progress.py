@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: Apache-2.0
 """Adaptive loop: turn result codes into local progress records and new guide versions.
 
     progress.py ingest 'QUIZZLER-ONBOARD {...}' [--guide G]   # or '-' for stdin

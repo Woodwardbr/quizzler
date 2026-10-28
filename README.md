@@ -12,3 +12,7 @@ python docs/onboarding/serve.py      # take the tour of Quizzler itself
 ```
 
 See [docs/onboarding/README.md](docs/onboarding/README.md) for usage, the guide contract and the security model. The original design is in [plans/codebase-pr-review-tool.md](plans/codebase-pr-review-tool.md).
+
+## Contributing and licence
+
+Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for the workflow, the DCO sign-off and our AI-assistance policy. Quizzler is licensed under the [Apache License 2.0](LICENSE).

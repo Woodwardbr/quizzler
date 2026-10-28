@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /* Quizzler guide engine.
  *
  * Turns a static guide document (see docs/onboarding/README.md for the

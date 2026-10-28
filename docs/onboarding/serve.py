@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: Apache-2.0
 """Serve a Quizzler guide on loopback with a per-run access token.
 
     python docs/onboarding/serve.py                     # shared onboarding guide

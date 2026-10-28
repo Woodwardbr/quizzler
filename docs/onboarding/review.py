@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: Apache-2.0
 """PR review workflow for Quizzler. Nothing here writes to GitHub.
 
     review.py prepare 42 [--diff-base merge-base|base-tip|<sha>]

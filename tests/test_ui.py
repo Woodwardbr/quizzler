@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """End-to-end browser tests through Firefox Marionette (skipped without Firefox)."""
 
 import json

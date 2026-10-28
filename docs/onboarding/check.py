@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: Apache-2.0
 """Validate guides and exercises: the drift gate run in CI.
 
     python docs/onboarding/check.py                    # tracked guides + shared exercises
