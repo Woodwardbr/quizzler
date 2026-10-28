@@ -477,7 +477,7 @@ class BrowserTest(unittest.TestCase):
         self.assertEqual((score("src"), score("lib")), ("80%", "0%"))
         self.assertIn("qz-tint-good", tone("src"))
         self.assertIn("qz-tint-bad", tone("lib"))
-        self.assertTrue(self.js("return document.querySelector('li[data-path=\"docs\"] .qz-score') === null"))  # untested
+        self.assertTrue(self.js("const li = document.querySelector('li[data-path=\"quizzler\"]'); return li !== null && li.querySelector('.qz-score') === null"))  # untested
         legend = self.js("return [...document.querySelectorAll('.qz-legend-item')].map(b => b.textContent)")
         self.assertEqual(legend, ["1App80%", "2Lib0%"])
 

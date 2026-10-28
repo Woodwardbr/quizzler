@@ -10,7 +10,7 @@ import guidelib as gl
 class PathPolicyTest(unittest.TestCase):
     def setUp(self):
         self.fx = Fixture()
-        self.policy = gl.PathPolicy(self.fx.root, ("docs/onboarding/local",))
+        self.policy = gl.PathPolicy(self.fx.root, ("quizzler/local",))
 
     def tearDown(self):
         self.fx.cleanup()
@@ -43,9 +43,9 @@ class PathPolicyTest(unittest.TestCase):
             self.refused(rel)
 
     def test_rejects_local_state_and_unknown_types(self):
-        self.fx.write("docs/onboarding/local/guide.html", "<p>x</p>")
+        self.fx.write("quizzler/local/guide.html", "<p>x</p>")
         self.fx.write("assets/logo.png", "png")
-        self.refused("docs/onboarding/local/guide.html")
+        self.refused("quizzler/local/guide.html")
         self.refused("assets/logo.png")
 
     def test_missing_file_is_not_found(self):
@@ -69,7 +69,7 @@ class PathPolicyTest(unittest.TestCase):
         self.fx.write("deploy/env.storage.json", "x")
         files = self.policy.walk()
         self.assertIn("src/app.py", files)
-        self.assertIn("docs/onboarding/guide.html", files)
+        self.assertIn("quizzler/guide.html", files)
         for bad in (".git/config", "node_modules/pkg/index.js", "deploy/env.storage.json"):
             self.assertNotIn(bad, files)
 

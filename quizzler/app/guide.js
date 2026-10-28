@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 /* Quizzler guide engine.
  *
- * Turns a static guide document (see docs/onboarding/README.md for the
+ * Turns a static guide document (see quizzler/README.md for the
  * contract) into an interactive page: progressive modules, confidence-rated
  * questions, exercises, a source pane with literal anchors, and, in review
  * mode, a Changes view, finding responses, and a final review summary.
@@ -2217,7 +2217,7 @@
     exportDialog.replaceChildren(
       el('h2', { id: 'qz-export-title', text: 'Results code' }),
       el('p', {}, 'Paste this into your Claude session so the next guide version can adapt to your answers. ',
-        hasServer ? 'Progress is also saved under docs/onboarding/local/, which Git ignores.' : ''),
+        hasServer ? 'Progress is also saved under quizzler/local/, which Git ignores.' : ''),
       area,
       el('div', { class: 'qz-row' },
         el('button', {

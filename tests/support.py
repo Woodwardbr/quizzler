@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Shared fixtures: a throwaway repository with its own docs/onboarding copy."""
+"""Shared fixtures: a throwaway repository with its own quizzler copy."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ import tempfile
 import textwrap
 from pathlib import Path
 
-ONBOARD = Path(__file__).resolve().parents[1] / "docs" / "onboarding"
+ONBOARD = Path(__file__).resolve().parents[1] / "quizzler"
 sys.path.insert(0, str(ONBOARD))
 
 GUIDE_TEMPLATE = """<!doctype html>
@@ -78,22 +78,22 @@ def git(cwd: Path, *args: str) -> str:
 
 
 class Fixture:
-    """A temp repo at ``root`` with docs/onboarding (engine copy) inside it."""
+    """A temp repo at ``root`` with quizzler (engine copy) inside it."""
 
     def __init__(self, *, git_init: bool = False):
         self.tmp = Path(tempfile.mkdtemp(prefix="quizzler-test-"))
         self.root = self.tmp / "repo"
-        self.onboard = self.root / "docs" / "onboarding"
+        self.onboard = self.root / "quizzler"
         (self.onboard / "app").mkdir(parents=True)
         for name in ("guide.js", "guide.css", "layout_check.js"):
             shutil.copy(ONBOARD / "app" / name, self.onboard / "app" / name)
         (self.onboard / "exercises").mkdir()
         (self.onboard / "expected").mkdir()
         self.write("src/app.py", APP_PY)
-        self.write("docs/onboarding/exercises/hello.py", HELLO)
-        self.write("docs/onboarding/expected/hello.out", "hello 42\n")
+        self.write("quizzler/exercises/hello.py", HELLO)
+        self.write("quizzler/expected/hello.out", "hello 42\n")
         self.write_guide("guide.html")
-        shutil.copy(ONBOARD.parents[1] / ".gitignore", self.root / ".gitignore")
+        shutil.copy(ONBOARD.parent / ".gitignore", self.root / ".gitignore")
         if git_init:
             git(self.root, "init", "-q", "-b", "main")
             git(self.root, "add", "-A")
@@ -109,7 +109,7 @@ class Fixture:
                     guide_id: str = "fixture", extra: str = "") -> Path:
         depth = rel.count("/")
         text = GUIDE_TEMPLATE.format(prefix="../" * depth, mode=mode, guide_id=guide_id, extra=extra, body=body)
-        return self.write(f"docs/onboarding/{rel}", text)
+        return self.write(f"quizzler/{rel}", text)
 
     def cleanup(self):
         shutil.rmtree(self.tmp, ignore_errors=True)

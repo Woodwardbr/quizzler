@@ -10,7 +10,7 @@ Both produce static HTML guides that load the shared `app/guide.js` and `app/gui
 ## Layout
 
 ```text
-docs/onboarding/
+quizzler/
   README.md            this file
   app/guide.js         guide UI: modules, questions, exercises, source pane, Changes/Review views
   app/guide.css        responsive layout, light/dark themes, diagram styles
@@ -37,34 +37,34 @@ docs/onboarding/
 
 ```sh
 # Shared onboarding guide (or local/guide.html if one has been generated)
-python docs/onboarding/serve.py            # prints http://127.0.0.1:<port>/t/<token>/...
+python quizzler/serve.py            # prints http://127.0.0.1:<port>/t/<token>/...
 
 # PR review
-python docs/onboarding/review.py prepare 42            # gh + git fetch, worktree, meta.json
-python docs/onboarding/review.py prepare 7 --local-base main --local-head my-branch   # no GitHub
-python docs/onboarding/check.py --review 42            # validate the generated guide against the worktree
-python docs/onboarding/serve.py --review 42
-python docs/onboarding/review.py ingest 42 -  < code.txt
-python docs/onboarding/review.py preview 42            # exact text + targets; posts nothing
-python docs/onboarding/review.py status 42             # has the PR moved since review?
-python docs/onboarding/review.py cleanup 42 --yes      # remove worktree, refs and local state
+python quizzler/review.py prepare 42            # gh + git fetch, worktree, meta.json
+python quizzler/review.py prepare 7 --local-base main --local-head my-branch   # no GitHub
+python quizzler/check.py --review 42            # validate the generated guide against the worktree
+python quizzler/serve.py --review 42
+python quizzler/review.py ingest 42 -  < code.txt
+python quizzler/review.py preview 42            # exact text + targets; posts nothing
+python quizzler/review.py status 42             # has the PR moved since review?
+python quizzler/review.py cleanup 42 --yes      # remove worktree, refs and local state
 
 # Adaptive loop for onboarding
-python docs/onboarding/progress.py ingest 'QUIZZLER-ONBOARD {...}'
-python docs/onboarding/progress.py report
-python docs/onboarding/progress.py bump
+python quizzler/progress.py ingest 'QUIZZLER-ONBOARD {...}'
+python quizzler/progress.py report
+python quizzler/progress.py bump
 
 # Gates (CI runs these)
 python -m unittest discover -s tests
-python docs/onboarding/check.py
-python docs/onboarding/check_layout.py --require-browser
+python quizzler/check.py
+python quizzler/check_layout.py --require-browser
 ```
 
 In the browser, `/` focuses the filter. Use the arrow keys to switch tabs, and Escape closes the source pane. Shift-click a line number in the source pane to select a range for a review comment.
 
 ## Guide document contract
 
-A guide is an HTML file somewhere under `docs/onboarding/`. Its asset links are relative, so `app/guide.css` from `guide.html` and `../../../app/guide.css` from `local/reviews/pr-N/guide.html`. Inline `<script>` is not allowed because the server's CSP blocks it.
+A guide is an HTML file somewhere under `quizzler/`. Its asset links are relative, so `app/guide.css` from `guide.html` and `../../../app/guide.css` from `local/reviews/pr-N/guide.html`. Inline `<script>` is not allowed because the server's CSP blocks it.
 
 ```html
 <main data-guide data-mode="onboard|review" data-guide-id="pr-42" data-version="1"
@@ -235,7 +235,7 @@ Threat boundaries, in order of strength:
 | Per-run token | other local users and web pages guessing URLs | `secrets.token_urlsafe(32)` in the path, constant-time compare, never logged or written to disk |
 | CSP and headers | injected script, framing, referrer leaks | `script-src 'self'`, `frame-ancestors 'none'`, `no-referrer`, `nosniff`, `no-store` |
 | POST checks | cross-site writes | JSON content type, same-origin `Origin`, 1 MB cap |
-| Path policy | reading secrets and private state | repo-relative paths only; no `..` or hidden components (so no `.git`); no secret-like names (`env.storage.*` with any extension, `*.pem`, `*.key`, `id_rsa*`, `*secret*`, `*credential*`, `*.env`, ...); no `docs/onboarding/local/`; a source-extension allowlist; resolved symlinks re-checked; 2 MB cap; 400 lines per request |
+| Path policy | reading secrets and private state | repo-relative paths only; no `..` or hidden components (so no `.git`); no secret-like names (`env.storage.*` with any extension, `*.pem`, `*.key`, `id_rsa*`, `*secret*`, `*credential*`, `*.env`, ...); no `quizzler/local/`; a source-extension allowlist; resolved symlinks re-checked; 2 MB cap; 400 lines per request |
 | Exercise registry | arbitrary code from the browser | the browser sends only a name, which must be registered by the active guide |
 
 **What exercise execution does not do.** Exercises run in a child Python process with a 10 s wall-clock timeout, CPU, memory and output-size rlimits (POSIX), a scrubbed environment, a throwaway working directory, no stdin, and one run at a time. This is *not a sandbox*. An exercise can still read files the user can read, and it can still reach the network. That is acceptable only because exercises are repository code that someone reviewed, or code Claude generated in your session that you can read. Never register an exercise from an untrusted PR without reading it first. If you need to run untrusted code, run the server inside a container or VM rather than widening what it runs.
@@ -244,7 +244,7 @@ The token and the path policy stop casual and cross-site access. They do not pro
 
 ## Privacy
 
-- Learner answers, guide drafts, review state, previews and PR details stay under `docs/onboarding/local/` and `.claude/worktrees/`. Both are in `.gitignore`. If `.claude/worktrees/` is not ignored in a target repository, `review.py` adds it to `.git/info/exclude`, which is never committed.
+- Learner answers, guide drafts, review state, previews and PR details stay under `quizzler/local/` and `.claude/worktrees/`. Both are in `.gitignore`. If `.claude/worktrees/` is not ignored in a target repository, `review.py` adds it to `.git/info/exclude`, which is never committed.
 - The server logs no request lines, because paths contain the token.
 - CI never reads `local/`.
 
@@ -254,8 +254,8 @@ The token and the path policy stop casual and cross-site access. They do not pro
 - `review.py cleanup N` is a dry run. `--yes` removes the worktree, the `refs/quizzler/pr-N/*` refs and `local/reviews/pr-N/`. Add `--keep-state` to keep your notes.
 - If a worktree directory was deleted by hand, run `git worktree prune` and then `review.py prepare N` again.
 - If a PR moved during review, `review.py status N` reports it as stale, and the guide shows a banner. Running `prepare` again checks out the new head, archives the old `results.json` as `results.<sha>.json`, and records the previous head in `meta.json`. Then run `check.py --review N` to find anchors that need refreshing.
-- To reset onboarding progress, delete `docs/onboarding/local/` (or the relevant `progress/` and `results/` entries). None of it is tracked.
+- To reset onboarding progress, delete `quizzler/local/` (or the relevant `progress/` and `results/` entries). None of it is tracked.
 
 ## Portability
 
-GitHub access is isolated in `review.GitHubAdapter`. `LocalAdapter` reviews any two local refs with the same UI. To adopt the engine in another repository, copy `docs/onboarding/` (without `local/`), the two `.claude/commands/` files and the two `.gitignore` lines. Then replace `guide.html` with that repository's onboarding guide.
+GitHub access is isolated in `review.GitHubAdapter`. `LocalAdapter` reviews any two local refs with the same UI. To adopt the engine in another repository, copy `quizzler/` (without `local/`), the two `.claude/commands/` files and the two `.gitignore` lines. Then replace `guide.html` with that repository's onboarding guide.

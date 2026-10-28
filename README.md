@@ -8,10 +8,10 @@ Quizzler is an interactive guide engine for learning a codebase and reviewing pu
 Everything runs locally with the Python standard library and Git. Generated guides and learner data stay in ignored directories.
 
 ```sh
-python docs/onboarding/serve.py      # take the tour of Quizzler itself
+python quizzler/serve.py      # take the tour of Quizzler itself
 ```
 
-See [docs/onboarding/README.md](docs/onboarding/README.md) for usage, the guide contract and the security model. The original design is in [plans/codebase-pr-review-tool.md](plans/codebase-pr-review-tool.md).
+See [quizzler/README.md](quizzler/README.md) for usage, the guide contract and the security model.
 
 ## Contributing and licence
 

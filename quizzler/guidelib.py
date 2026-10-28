@@ -48,7 +48,7 @@ GUIDE_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$")
 
 
 def find_repo_root(start: Path = ONBOARD_DIR) -> Path:
-    """Return the git top level containing ``start``, or two levels up."""
+    """Return the git top level containing ``start``, or the folder above the engine."""
     try:
         out = subprocess.run(
             ["git", "-C", str(start), "rev-parse", "--show-toplevel"],
@@ -56,7 +56,7 @@ def find_repo_root(start: Path = ONBOARD_DIR) -> Path:
         ).stdout.strip()
         return Path(out).resolve()
     except (OSError, subprocess.CalledProcessError):
-        return Path(start).resolve().parents[1]
+        return Path(start).resolve().parent
 
 
 # --------------------------------------------------------------------------

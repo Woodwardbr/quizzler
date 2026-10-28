@@ -33,12 +33,12 @@ CI runs these three checks, and so should you before pushing:
 
 ```sh
 python -m unittest discover -s tests
-python docs/onboarding/check.py
-python docs/onboarding/check_layout.py --require-browser
+python quizzler/check.py
+python quizzler/check_layout.py --require-browser
 ```
 
 - `check.py` is the drift gate. If you change a source file that a guide anchors to, it tells you which anchor moved. Update the guide in the same pull request.
-- See [docs/onboarding/README.md](docs/onboarding/README.md) for the guide contract and the security model.
+- See [quizzler/README.md](quizzler/README.md) for the guide contract and the security model.
 
 ## AI-assisted contributions
 

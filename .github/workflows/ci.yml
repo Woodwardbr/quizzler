@@ -19,6 +19,6 @@ jobs:
       - name: Unit, server, review and browser tests
         run: python -m unittest discover -s tests -v
       - name: Drift gate (anchors, symbols, exercise outputs)
-        run: python docs/onboarding/check.py
+        run: python quizzler/check.py
       - name: Layout gate
-        run: python docs/onboarding/check_layout.py --require-browser
+        run: python quizzler/check_layout.py --require-browser
