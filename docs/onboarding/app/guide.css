@@ -392,7 +392,8 @@ main[data-guide] th { background: var(--surface-2); }
   font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em;
   padding: 0.1rem 0.45rem; border-radius: 4px; background: var(--warn-soft); color: var(--warn);
 }
-.qz-sev-major, .qz-sev-critical, .qz-sev-high { background: var(--bad-soft); color: var(--bad); }
+.qz-sev-blocking, .qz-sev-major, .qz-sev-critical, .qz-sev-high { background: var(--bad-soft); color: var(--bad); }
+.qz-sev-nit, .qz-sev-question { background: var(--surface); color: var(--muted); border: 1px solid var(--border); }
 .qz-finding-controls { border-top: 1px solid var(--border); margin-top: 1rem; padding-top: 0.75rem; }
 .qz-block { display: block; margin: 0.6rem 0; font-size: 0.9rem; color: var(--muted); }
 .qz-block textarea { margin-top: 0.25rem; color: var(--text); }
