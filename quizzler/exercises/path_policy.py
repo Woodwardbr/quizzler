@@ -14,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from guidelib import PathPolicy, PolicyError  # noqa: E402
 
-policy = PathPolicy(Path("/repo"), deny_prefixes=("docs/onboarding/local",))
+policy = PathPolicy(Path("/repo"), deny_prefixes=("quizzler/local",))
 
 CASES = [
     "src/app.py",
@@ -24,8 +24,8 @@ CASES = [
     "config/.env",
     "deploy/env.storage.json",
     "certs/server.pem",
-    "docs/onboarding/local/guide.html",
-    "docs/onboarding/serve.py",
+    "quizzler/local/guide.html",
+    "quizzler/serve.py",
     "assets/logo.png",
     "Makefile",
 ]

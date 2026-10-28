@@ -2,9 +2,9 @@
 # SPDX-License-Identifier: Apache-2.0
 """Serve a Quizzler guide on loopback with a per-run access token.
 
-    python docs/onboarding/serve.py                     # shared onboarding guide
-    python docs/onboarding/serve.py --guide docs/onboarding/local/guide.html
-    python docs/onboarding/serve.py --review 42         # PR review guide
+    python quizzler/serve.py                     # shared onboarding guide
+    python quizzler/serve.py --guide quizzler/local/guide.html
+    python quizzler/serve.py --review 42         # PR review guide
 
 Every route except ``/healthz`` lives under ``/t/<token>/``. The token is
 random per process and is only printed to the terminal. Source access goes
@@ -468,7 +468,7 @@ def load_review(number: int, onboard_dir: Path = gl.ONBOARD_DIR) -> tuple[dict, 
 
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--guide", type=Path, help="guide HTML under docs/onboarding/")
+    parser.add_argument("--guide", type=Path, help="guide HTML under quizzler/")
     parser.add_argument("--review", type=int, metavar="N", help="serve the prepared review for PR N")
     parser.add_argument("--repo-root", type=Path, help="repository whose source is shown")
     parser.add_argument("--port", type=int, default=0, help="loopback port (default: random)")

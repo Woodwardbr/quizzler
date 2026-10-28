@@ -57,7 +57,7 @@
         <text class="small" x="105" y="130">next version</text>
       </svg>
       </div>
-      <figcaption>The loop: Claude writes a guide, you work through it, and your answers shape the next version. Everything personal stays in <code>docs/onboarding/local/</code>, which Git ignores.</figcaption>
+      <figcaption>The loop: Claude writes a guide, you work through it, and your answers shape the next version. Everything personal stays in <code>quizzler/local/</code>, which Git ignores.</figcaption>
     </figure>
 
     <h3>Where things live</h3>
@@ -65,16 +65,15 @@
     <table>
       <thead><tr><th>Path</th><th>What is there</th></tr></thead>
       <tbody>
-        <tr data-area="docs/onboarding/"><td><code>docs/onboarding/</code></td><td>The guide engine: the server, the shared library and the CLI tools (<code>check</code>, <code>check_layout</code>, <code>review</code>, <code>progress</code>, <code>relay</code>).</td></tr>
-        <tr data-area="docs/onboarding/serve.py"><td><code data-src="docs/onboarding/serve.py" data-sym="GuideApp">serve.py</code></td><td>The loopback server.</td></tr>
-        <tr data-area="docs/onboarding/guidelib.py"><td><code data-src="docs/onboarding/guidelib.py" data-sym="PathPolicy">guidelib.py</code></td><td>Shared logic: path policy, anchors, guide parser, exercise runner, git diffs, request queue.</td></tr>
-        <tr data-area="docs/onboarding/app/"><td><code data-src="docs/onboarding/app/guide.js" data-ref="Quizzler guide engine.">app/</code></td><td>The browser engine (<code>guide.js</code>, <code>guide.css</code>) and the layout probe.</td></tr>
-        <tr data-area="docs/onboarding/exercises/"><td><code>exercises/</code> · <code>expected/</code></td><td>Shared exercises and their recorded output, checked in CI.</td></tr>
-        <tr data-area="docs/onboarding/examples/"><td><code>examples/</code></td><td>A maintained review-mode guide used as an authoring reference.</td></tr>
+        <tr data-area="quizzler/"><td><code>quizzler/</code></td><td>The guide engine: the server, the shared library and the CLI tools (<code>check</code>, <code>check_layout</code>, <code>review</code>, <code>progress</code>, <code>relay</code>).</td></tr>
+        <tr data-area="quizzler/serve.py"><td><code data-src="quizzler/serve.py" data-sym="GuideApp">serve.py</code></td><td>The loopback server.</td></tr>
+        <tr data-area="quizzler/guidelib.py"><td><code data-src="quizzler/guidelib.py" data-sym="PathPolicy">guidelib.py</code></td><td>Shared logic: path policy, anchors, guide parser, exercise runner, git diffs, request queue.</td></tr>
+        <tr data-area="quizzler/app/"><td><code data-src="quizzler/app/guide.js" data-ref="Quizzler guide engine.">app/</code></td><td>The browser engine (<code>guide.js</code>, <code>guide.css</code>) and the layout probe.</td></tr>
+        <tr data-area="quizzler/exercises/"><td><code>exercises/</code> · <code>expected/</code></td><td>Shared exercises and their recorded output, checked in CI.</td></tr>
+        <tr data-area="quizzler/examples/"><td><code>examples/</code></td><td>A maintained review-mode guide used as an authoring reference.</td></tr>
         <tr data-area="tests/"><td><code>tests/</code></td><td>Unit, server, review, relay and browser tests.</td></tr>
-        <tr data-area="plans/"><td><code>plans/</code></td><td>The original design plan.</td></tr>
         <tr><td><code>.claude/commands/</code></td><td>The <code>/onboard</code> and <code>/review-pr</code> instructions for Claude (hidden folders aren't shown in the map).</td></tr>
-        <tr><td><code>docs/onboarding/local/</code></td><td>Your personal state. Git ignores it.</td></tr>
+        <tr><td><code>quizzler/local/</code></td><td>Your personal state. Git ignores it.</td></tr>
       </tbody>
     </table>
     </div>
@@ -106,11 +105,11 @@
       <h3>Key points</h3>
       <ul>
         <li><code>/onboard</code> teaches a repository. <code>/review-pr &lt;N&gt;</code> teaches a pull request and collects your review.</li>
-        <li>Both produce the same thing: a static HTML guide that loads <code data-src="docs/onboarding/app/guide.js" data-ref="Quizzler guide engine.">app/guide.js</code> and <code>app/guide.css</code>.</li>
-        <li>A small local server, <code data-src="docs/onboarding/serve.py" data-sym="GuideApp">GuideApp</code>, serves the guide and gives the browser read-only access to source.</li>
+        <li>Both produce the same thing: a static HTML guide that loads <code data-src="quizzler/app/guide.js" data-ref="Quizzler guide engine.">app/guide.js</code> and <code>app/guide.css</code>.</li>
+        <li>A small local server, <code data-src="quizzler/serve.py" data-sym="GuideApp">GuideApp</code>, serves the guide and gives the browser read-only access to source.</li>
       </ul>
     </div>
-    <p class="note">Highlighted code like <code data-src="docs/onboarding/serve.py" data-sym="GuideApp">GuideApp</code> is a link: the code pane on the right shows it, and follows along as you scroll.</p>
+    <p class="note">Highlighted code like <code data-src="quizzler/serve.py" data-sym="GuideApp">GuideApp</code> is a link: the code pane on the right shows it, and follows along as you scroll.</p>
 
 
     <p>The command-line tools sit next to the server:</p>
@@ -118,10 +117,10 @@
     <table>
       <thead><tr><th>Tool</th><th>Job</th></tr></thead>
       <tbody>
-        <tr><td><code data-src="docs/onboarding/check.py" data-sym="check_guide">check.py</code></td><td>Drift gate: anchors, symbols, guide contract, exercise outputs.</td></tr>
-        <tr><td><code data-src="docs/onboarding/review.py" data-sym="prepare">review.py</code></td><td>PR worktrees, diff bases, ingesting results, SHA-bound previews.</td></tr>
-        <tr><td><code data-src="docs/onboarding/progress.py" data-sym="record_results">progress.py</code></td><td>Classifies answers, writes progress, bumps guide versions.</td></tr>
-        <tr><td><code data-src="docs/onboarding/check_layout.py" data-sym="run">check_layout.py</code></td><td>Headless browser check for broken diagrams and narrow-screen layouts.</td></tr>
+        <tr><td><code data-src="quizzler/check.py" data-sym="check_guide">check.py</code></td><td>Drift gate: anchors, symbols, guide contract, exercise outputs.</td></tr>
+        <tr><td><code data-src="quizzler/review.py" data-sym="prepare">review.py</code></td><td>PR worktrees, diff bases, ingesting results, SHA-bound previews.</td></tr>
+        <tr><td><code data-src="quizzler/progress.py" data-sym="record_results">progress.py</code></td><td>Classifies answers, writes progress, bumps guide versions.</td></tr>
+        <tr><td><code data-src="quizzler/check_layout.py" data-sym="run">check_layout.py</code></td><td>Headless browser check for broken diagrams and narrow-screen layouts.</td></tr>
       </tbody>
     </table>
     </div>
@@ -129,12 +128,12 @@
     <div class="question" data-q="map-state" data-answer="b">
       <p class="prompt">You are halfway through reviewing PR 42. Where are your answers and comment drafts stored?</p>
       <ol class="choices">
-        <li data-choice="a">In a tracked file under <code>docs/onboarding/reviews/</code> so teammates can see them.</li>
-        <li data-choice="b">In <code>docs/onboarding/local/reviews/pr-42/</code>, which Git ignores.</li>
+        <li data-choice="a">In a tracked file under <code>quizzler/reviews/</code> so teammates can see them.</li>
+        <li data-choice="b">In <code>quizzler/local/reviews/pr-42/</code>, which Git ignores.</li>
         <li data-choice="c">As draft review comments on GitHub.</li>
         <li data-choice="d">Only in the browser tab, and lost on reload.</li>
       </ol>
-      <div class="explain"><p>The server saves the results next to the review guide under <code>local/</code>. <code data-src="docs/onboarding/guidelib.py" data-sym="results_path_for">results_path_for</code> never returns a path outside <code>local/</code>, and nothing is sent to GitHub until you say so explicitly.</p></div>
+      <div class="explain"><p>The server saves the results next to the review guide under <code>local/</code>. <code data-src="quizzler/guidelib.py" data-sym="results_path_for">results_path_for</code> never returns a path outside <code>local/</code>, and nothing is sent to GitHub until you say so explicitly.</p></div>
     </div>
 
     <div class="question" data-q="map-shared" data-answer="c">
@@ -159,16 +158,16 @@
     </div>
     <h3>The four layers</h3>
     <ol>
-      <li><strong>Loopback only.</strong> It binds to <code data-src="docs/onboarding/serve.py" data-ref='HOST = "127.0.0.1"'>127.0.0.1</code>, and <code data-src="docs/onboarding/serve.py" data-sym="Handler._host_ok">_host_ok</code> rejects any other <code>Host</code> header, which blocks DNS-rebinding tricks.</li>
-      <li><strong>Per-run token.</strong> Each process picks <code data-src="docs/onboarding/serve.py" data-ref="self.token = token or secrets.token_urlsafe(32)">a fresh random token</code>. Every route except <code>/healthz</code> lives under <code>/t/&lt;token&gt;/</code>, and the token is compared in <code data-src="docs/onboarding/serve.py" data-ref="hmac.compare_digest(token.encode(), self.app.token.encode())">constant time</code>.</li>
-      <li><strong>Path policy.</strong> <code data-src="docs/onboarding/guidelib.py" data-sym="PathPolicy">PathPolicy</code> refuses traversal, hidden components, secret-looking names such as <code data-src="docs/onboarding/guidelib.py" data-ref='"env.storage.*", "env.storage"'>env.storage.*</code>, the guide's own <code>local/</code> state, and non-source file types. After resolving symlinks it <code data-src="docs/onboarding/guidelib.py" data-ref="if not resolved.is_relative_to(self.root):">checks the real path again</code>.</li>
-      <li><strong>Registered exercises only.</strong> The browser sends only an exercise name. Names that the active guide does not register get <code data-src="docs/onboarding/serve.py" data-ref='"exercise is not registered for this guide"'>a 404</code>. Registered exercises run in <code data-src="docs/onboarding/guidelib.py" data-sym="run_exercise" data-key="proc.wait(timeout=timeout)|_kill(proc)" data-vars="timeout">a constrained subprocess</code>.</li>
+      <li><strong>Loopback only.</strong> It binds to <code data-src="quizzler/serve.py" data-ref='HOST = "127.0.0.1"'>127.0.0.1</code>, and <code data-src="quizzler/serve.py" data-sym="Handler._host_ok">_host_ok</code> rejects any other <code>Host</code> header, which blocks DNS-rebinding tricks.</li>
+      <li><strong>Per-run token.</strong> Each process picks <code data-src="quizzler/serve.py" data-ref="self.token = token or secrets.token_urlsafe(32)">a fresh random token</code>. Every route except <code>/healthz</code> lives under <code>/t/&lt;token&gt;/</code>, and the token is compared in <code data-src="quizzler/serve.py" data-ref="hmac.compare_digest(token.encode(), self.app.token.encode())">constant time</code>.</li>
+      <li><strong>Path policy.</strong> <code data-src="quizzler/guidelib.py" data-sym="PathPolicy">PathPolicy</code> refuses traversal, hidden components, secret-looking names such as <code data-src="quizzler/guidelib.py" data-ref='"env.storage.*", "env.storage"'>env.storage.*</code>, the guide's own <code>local/</code> state, and non-source file types. After resolving symlinks it <code data-src="quizzler/guidelib.py" data-ref="if not resolved.is_relative_to(self.root):">checks the real path again</code>.</li>
+      <li><strong>Registered exercises only.</strong> The browser sends only an exercise name. Names that the active guide does not register get <code data-src="quizzler/serve.py" data-ref='"exercise is not registered for this guide"'>a 404</code>. Registered exercises run in <code data-src="quizzler/guidelib.py" data-sym="run_exercise" data-key="proc.wait(timeout=timeout)|_kill(proc)" data-vars="timeout">a constrained subprocess</code>.</li>
     </ol>
 
     <div data-depth="standard">
     <h3>The token check, in full</h3>
     <p>Every request goes through <code>_route</code> first:</p>
-    <figure class="code-listing" data-src="docs/onboarding/serve.py" data-lines="185-194"><pre>    def _route(self):
+    <figure class="code-listing" data-src="quizzler/serve.py" data-lines="185-194"><pre>    def _route(self):
         """Return (rest_of_path, query) for token-scoped routes, or None."""
         parts = urlsplit(self.path)
         raw = parts.path
@@ -197,7 +196,7 @@
         <li data-choice="b">404. Without a valid <code>/t/&lt;token&gt;/</code> prefix, every route except <code>/healthz</code> is "not found".</li>
         <li data-choice="c">A redirect to a login page.</li>
       </ol>
-      <div class="explain"><p><code data-src="docs/onboarding/serve.py" data-sym="Handler._route">_route</code> returns <code>None</code> for anything outside the token prefix, and the dispatcher turns that into a 404. Even asset paths need the token.</p></div>
+      <div class="explain"><p><code data-src="quizzler/serve.py" data-sym="Handler._route">_route</code> returns <code>None</code> for anything outside the token prefix, and the dispatcher turns that into a 404. Even asset paths need the token.</p></div>
     </div>
 
     <div class="question" data-q="server-symlink" data-answer="b">
@@ -207,7 +206,7 @@
         <li data-choice="b">A refusal. The policy checks the resolved path again, and the <code>.git</code> component is hidden.</li>
         <li data-choice="c">An empty file.</li>
       </ol>
-      <div class="explain"><p><code data-src="docs/onboarding/guidelib.py" data-sym="PathPolicy.check" data-key="resolved = candidate.resolve(strict=True)|if not resolved.is_relative_to(self.root):|self._check_parts(resolved.relative_to(self.root).parts, rel)">PathPolicy.check</code> resolves symlinks, confirms the result is inside the root, and then runs the component rules again on the resolved path.</p></div>
+      <div class="explain"><p><code data-src="quizzler/guidelib.py" data-sym="PathPolicy.check" data-key="resolved = candidate.resolve(strict=True)|if not resolved.is_relative_to(self.root):|self._check_parts(resolved.relative_to(self.root).parts, rel)">PathPolicy.check</code> resolves symlinks, confirms the result is inside the root, and then runs the component rules again on the resolved path.</p></div>
     </div>
 
     <div class="question" data-q="server-exercise" data-answer="c">
@@ -235,10 +234,10 @@
     <table>
       <thead><tr><th>Attribute</th><th>Meaning</th><th>Checked by</th></tr></thead>
       <tbody>
-        <tr><td><code>data-src</code> + <code>data-ref</code></td><td>Literal text that must appear exactly once in the file. Add <code>data-occurrence</code> when the text repeats.</td><td><code data-src="docs/onboarding/guidelib.py" data-sym="resolve_anchor">resolve_anchor</code></td></tr>
-        <tr><td><code>data-src</code> + <code>data-sym</code></td><td>A function, class or constant that must still exist.</td><td><code data-src="docs/onboarding/guidelib.py" data-sym="find_symbols">find_symbols</code></td></tr>
-        <tr><td><code>data-exercise</code></td><td>A registered exercise with a <code>PREDICT:</code> docstring and recorded output.</td><td><code data-src="docs/onboarding/check.py" data-sym="check_exercises">check_exercises</code></td></tr>
-        <tr><td><code>data-finding</code> + <code>data-lines</code></td><td>A proposed review finding anchored to a line range at the reviewed head SHA.</td><td><code data-src="docs/onboarding/review.py" data-sym="preview">preview</code></td></tr>
+        <tr><td><code>data-src</code> + <code>data-ref</code></td><td>Literal text that must appear exactly once in the file. Add <code>data-occurrence</code> when the text repeats.</td><td><code data-src="quizzler/guidelib.py" data-sym="resolve_anchor">resolve_anchor</code></td></tr>
+        <tr><td><code>data-src</code> + <code>data-sym</code></td><td>A function, class or constant that must still exist.</td><td><code data-src="quizzler/guidelib.py" data-sym="find_symbols">find_symbols</code></td></tr>
+        <tr><td><code>data-exercise</code></td><td>A registered exercise with a <code>PREDICT:</code> docstring and recorded output.</td><td><code data-src="quizzler/check.py" data-sym="check_exercises">check_exercises</code></td></tr>
+        <tr><td><code>data-finding</code> + <code>data-lines</code></td><td>A proposed review finding anchored to a line range at the reviewed head SHA.</td><td><code data-src="quizzler/review.py" data-sym="preview">preview</code></td></tr>
       </tbody>
     </table>
     </div>
@@ -251,7 +250,7 @@
     </ol>
     <p>Each one stays failing until the guide or the recording is updated on purpose.</p>
     <div class="note" data-depth="deep">
-      <p><strong>Deep dive:</strong> listings may leave lines out. <code data-src="docs/onboarding/guidelib.py" data-sym="listing_drift">listing_drift</code> only requires that every line shown appears in the file, in the same order.</p>
+      <p><strong>Deep dive:</strong> listings may leave lines out. <code data-src="quizzler/guidelib.py" data-sym="listing_drift">listing_drift</code> only requires that every line shown appears in the file, in the same order.</p>
     </div>
 
     <div class="question" data-q="contract-ambiguous" data-answer="b">
@@ -287,8 +286,8 @@
     <h3>One turn of the loop</h3>
     <ol>
       <li>You answer a module's questions. The server saves them under <code>local/</code>, or you paste the <code>QUIZZLER-ONBOARD</code> result code.</li>
-      <li><code data-src="docs/onboarding/guidelib.py" data-sym="classify">classify</code> sorts each answer into one of four groups (table below).</li>
-      <li><code data-src="docs/onboarding/progress.py" data-sym="bump">progress.py bump</code> archives the guide, increments <code>data-version</code>, and marks mastered questions <code data-src="docs/onboarding/progress.py" data-ref='retired.setdefault(qid, f"v{version}:mastered")'>data-retired</code>.</li>
+      <li><code data-src="quizzler/guidelib.py" data-sym="classify">classify</code> sorts each answer into one of four groups (table below).</li>
+      <li><code data-src="quizzler/progress.py" data-sym="bump">progress.py bump</code> archives the guide, increments <code>data-version</code>, and marks mastered questions <code data-src="quizzler/progress.py" data-ref='retired.setdefault(qid, f"v{version}:mastered")'>data-retired</code>.</li>
       <li>Claude rewrites the weak spots from <code>progress.py report</code>.</li>
     </ol>
     <div class="table-wrap">
@@ -303,8 +302,8 @@
     <h3>In review mode</h3>
     <ul>
       <li>Proposed findings stay locked until you answer the module's questions, so you form your own view first.</li>
-      <li><code data-src="docs/onboarding/review.py" data-sym="preview">review.py preview</code> binds every comment marked ready to the reviewed head SHA.</li>
-      <li><code data-src="docs/onboarding/review.py" data-ref="Posting comments is deliberately not implemented">Posting is not part of the tool.</code> It needs your separate, explicit instruction.</li>
+      <li><code data-src="quizzler/review.py" data-sym="preview">review.py preview</code> binds every comment marked ready to the reviewed head SHA.</li>
+      <li><code data-src="quizzler/review.py" data-ref="Posting comments is deliberately not implemented">Posting is not part of the tool.</code> It needs your separate, explicit instruction.</li>
     </ul>
 
     <div class="exercise" data-exercise="classify_answers"></div>

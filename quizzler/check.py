@@ -2,9 +2,9 @@
 # SPDX-License-Identifier: Apache-2.0
 """Validate guides and exercises: the drift gate run in CI.
 
-    python docs/onboarding/check.py                    # tracked guides + shared exercises
-    python docs/onboarding/check.py --update-expected  # re-record expected/ outputs
-    python docs/onboarding/check.py --review 42        # a generated review guide
+    python quizzler/check.py                    # tracked guides + shared exercises
+    python quizzler/check.py --update-expected  # re-record expected/ outputs
+    python quizzler/check.py --review 42        # a generated review guide
 
 Checks the guide contract, every ``data-src``/``data-ref`` literal anchor
 (present and unambiguous), every ``data-sym`` symbol, finding line ranges,
@@ -74,7 +74,7 @@ def check_guide(guide_path: Path, repo_root: Path, report: Report, *,
         if target in expected_assets:
             seen_assets.add(target)
         else:
-            report.error(name, f"asset {href!r} does not point at docs/onboarding/app/")
+            report.error(name, f"asset {href!r} does not point at quizzler/app/")
     for missing in sorted(expected_assets - seen_assets):
         report.error(name, f"guide does not load app/{missing.name}")
 

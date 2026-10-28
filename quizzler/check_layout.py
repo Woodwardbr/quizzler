@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: Apache-2.0
 """Layout gate: render guides in a headless browser and report broken layouts.
 
-    python docs/onboarding/check_layout.py                  # tracked guides
-    python docs/onboarding/check_layout.py --guide G --require-browser
+    python quizzler/check_layout.py                  # tracked guides
+    python quizzler/check_layout.py --guide G --require-browser
 
 Each guide is served by serve.py's GuideApp on loopback and loaded with
 ``?layoutcheck=1`` at several viewport sizes. app/layout_check.js measures

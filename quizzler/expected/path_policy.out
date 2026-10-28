@@ -5,7 +5,7 @@ deny  .git/config  (hidden path refused)
 deny  config/.env  (hidden path refused)
 deny  deploy/env.storage.json  (secret-like path refused)
 deny  certs/server.pem  (secret-like path refused)
-deny  docs/onboarding/local/guide.html  (local guide state refused)
-allow docs/onboarding/serve.py
+deny  quizzler/local/guide.html  (local guide state refused)
+allow quizzler/serve.py
 deny  assets/logo.png  (file type not allowlisted)
 allow Makefile

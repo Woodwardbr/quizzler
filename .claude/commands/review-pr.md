@@ -5,7 +5,7 @@ argument-hint: "<PR number> [--diff-base merge-base|base-tip|<sha>]"
 
 You are running Quizzler's PR review flow for: $ARGUMENTS
 
-Read `docs/onboarding/README.md` for the guide contract. All state goes in `docs/onboarding/local/reviews/pr-<N>/` and the code under review is in `.claude/worktrees/pr-<N>/`. Both are ignored by Git.
+Read `quizzler/README.md` for the guide contract. All state goes in `quizzler/local/reviews/pr-<N>/` and the code under review is in `.claude/worktrees/pr-<N>/`. Both are ignored by Git.
 
 ## Writing style (required)
 
@@ -43,7 +43,7 @@ Exercises import the PR's code and run it on this machine with the server's envi
 
 ## Steps
 
-1. **Prepare.** Run `python docs/onboarding/review.py prepare <N>` with the user's `--diff-base` if they gave one. This fetches the PR with `gh`, creates or refreshes the worktree at the exact head SHA, and records the SHAs in `meta.json`. If a review already exists and the head moved, tell the user that the earlier results were archived.
+1. **Prepare.** Run `python quizzler/review.py prepare <N>` with the user's `--diff-base` if they gave one. This fetches the PR with `gh`, creates or refreshes the worktree at the exact head SHA, and records the SHAs in `meta.json`. If a review already exists and the head moved, tell the user that the earlier results were archived.
 2. **Understand the change before teaching it.** Work in the worktree, not the main checkout.
    - A small PR: read the whole diff yourself. A large one: send parallel agents through each subsystem. Ask them for `file:line` evidence, shapes and units, defaults, and suspected bugs labelled *confirmed* or *suspected*. Re-read whatever you will teach.
    - Work through these questions:
@@ -53,24 +53,24 @@ Exercises import the PR's code and run it on this machine with the server's envi
      - **Risk:** look for future-data leakage, train/eval mismatch, compatibility with existing stored data and caches, performance, and silent failures.
      - **Scope:** are there unrelated changes, and does the PR follow the repo's conventions (validators, config examples, type annotations, how secrets are passed)?
    - Ask the user which parts matter most to them, then propose the modules, for example request/data flow, persistence, model behaviour, and UI/API. By default go deep on the core logic and keep plumbing short. Use one module for a small PR.
-   - Write the plan to `docs/onboarding/local/reviews/pr-<N>/plan.md`.
-3. **Write module 1 only.** Create `docs/onboarding/local/reviews/pr-<N>/guide.html` with `data-mode="review"`, `data-guide-id="pr-<N>"`, `data-pr`, `data-head-sha` (from meta.json) and `data-version="1"`. Its asset links are `../../../app/guide.css` and `../../../app/guide.js`. The module includes:
+   - Write the plan to `quizzler/local/reviews/pr-<N>/plan.md`.
+3. **Write module 1 only.** Create `quizzler/local/reviews/pr-<N>/guide.html` with `data-mode="review"`, `data-guide-id="pr-<N>"`, `data-pr`, `data-head-sha` (from meta.json) and `data-version="1"`. Its asset links are `../../../app/guide.css` and `../../../app/guide.js`. The module includes:
    - Context, following the writing style above: key points, a before/after diagram of the changed flow, and bullets explaining what changed and why. Show changed code as a `code-listing` of the head lines.
    - Anchors into the head code (`data-src` + `data-ref`, `data-sym` or `data-lines`).
    - 2–3 questions that check whether the reviewer understands the behaviour change.
    - Exercises where useful, in `local/reviews/pr-<N>/exercises/`. Read any PR code before an exercise runs it.
    - Proposed findings inside `.findings`. Each needs a concrete failure scenario (the inputs or state that lead to the wrong behaviour), evidence anchored at the head SHA, the impact, and an editable `.comment-draft`. Say what is uncertain. Do not include style nits unless they matter. If you have no real findings, include none.
-4. **Validate.** Run `python docs/onboarding/check.py --review <N>` and `python docs/onboarding/check_layout.py --guide docs/onboarding/local/reviews/pr-<N>/guide.html`, and fix what they report. Do not hand the guide over until the layout check ends with `OK`, and look at a screenshot of the new module yourself.
-5. **Serve.** Start `python docs/onboarding/serve.py --review <N>` in the background and give the user the URL. Findings stay hidden until the module's questions are answered. The reviewer can agree, be unsure or disagree with each one, edit the comment drafts, and add their own line comments from the source pane.
-6. **Listen.** Start `python docs/onboarding/relay.py --review <N> wait` in the background. When the reviewer finishes the last written module, they press "Ask Claude for the next module", which queues a `next-module` request and wakes you. Handle it as in step 7, run `relay.py --review <N> done <ids>`, and start the wait again each time. The page reloads itself when the guide changes.
-7. **Loop.** When a `next-module` request arrives or the user says the module is done, read `local/reviews/pr-<N>/results.json` (autosaved), or ingest the code they paste with `python docs/onboarding/review.py ingest <N> -`. Then:
-   - Classify the answers and adapt. Clear up misconceptions before moving on, and use `python docs/onboarding/progress.py --guide docs/onboarding/local/reviews/pr-<N>/guide.html report`.
+4. **Validate.** Run `python quizzler/check.py --review <N>` and `python quizzler/check_layout.py --guide quizzler/local/reviews/pr-<N>/guide.html`, and fix what they report. Do not hand the guide over until the layout check ends with `OK`, and look at a screenshot of the new module yourself.
+5. **Serve.** Start `python quizzler/serve.py --review <N>` in the background and give the user the URL. Findings stay hidden until the module's questions are answered. The reviewer can agree, be unsure or disagree with each one, edit the comment drafts, and add their own line comments from the source pane.
+6. **Listen.** Start `python quizzler/relay.py --review <N> wait` in the background. When the reviewer finishes the last written module, they press "Ask Claude for the next module", which queues a `next-module` request and wakes you. Handle it as in step 7, run `relay.py --review <N> done <ids>`, and start the wait again each time. The page reloads itself when the guide changes.
+7. **Loop.** When a `next-module` request arrives or the user says the module is done, read `local/reviews/pr-<N>/results.json` (autosaved), or ingest the code they paste with `python quizzler/review.py ingest <N> -`. Then:
+   - Classify the answers and adapt. Clear up misconceptions before moving on, and use `python quizzler/progress.py --guide quizzler/local/reviews/pr-<N>/guide.html report`.
    - Take the reviewer's disagreements and "unsure" votes seriously. Re-check the evidence, and withdraw or correct a finding when they are right.
    - Check each of the reviewer's own comments against the code and label it *confirmed*, *misunderstanding* or *question for the author*. Credit the reviewer for a finding they found.
    - Give each finding a severity in `data-severity`: `blocking`, `should-fix`, `nit` or `question`.
-   - Append a dated entry to `docs/onboarding/local/reviews/pr-<N>/notes.md` with the head SHA, the score, the misconceptions, and the triage results. Do not edit `progress.md`, because `progress.py` writes it.
+   - Append a dated entry to `quizzler/local/reviews/pr-<N>/notes.md` with the head SHA, the score, the misconceptions, and the triage results. Do not edit `progress.md`, because `progress.py` writes it.
    - Run `progress.py --guide … bump`, then append the next module. Do not change earlier modules except to correct them. Validate and tell the user to reload.
-8. **Final review.** After the last module, point the user to the Review tab, where findings and comments are grouped as ready, needs another look and not posting. Then run `python docs/onboarding/review.py preview <N>` and show its output, including any PROBLEM lines, for example comments outside the diff. Stop here.
+8. **Final review.** After the last module, point the user to the Review tab, where findings and comments are grouped as ready, needs another look and not posting. Then run `python quizzler/review.py preview <N>` and show its output, including any PROBLEM lines, for example comments outside the diff. Stop here.
 9. **Posting** happens only under the hard rule above, and then only with `gh api` against the `commit_id` from the preview.
 
-When the user is finished, offer `python docs/onboarding/review.py cleanup <N>`. It is a dry run without `--yes`.
+When the user is finished, offer `python quizzler/review.py cleanup <N>`. It is a dry run without `--yes`.

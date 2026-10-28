@@ -12,10 +12,10 @@ import serve
 class ServerTest(unittest.TestCase):
     def setUp(self):
         self.fx = Fixture()
-        self.fx.write("docs/onboarding/exercises/unlisted.py", '"""PREDICT: x"""\nprint("should not run")\n')
+        self.fx.write("quizzler/exercises/unlisted.py", '"""PREDICT: x"""\nprint("should not run")\n')
         self.fx.write("deploy/env.storage.json", '{"key": "secret"}\n')
         self.fx.write("config/.env", "SECRET=1\n")
-        self.fx.write("docs/onboarding/local/results/other.json", "{}\n")
+        self.fx.write("quizzler/local/results/other.json", "{}\n")
         self.app = serve.GuideApp(self.fx.root, self.fx.onboard / "guide.html", onboard_dir=self.fx.onboard)
         self.server = serve.make_server(self.app)
         threading.Thread(target=self.server.serve_forever, daemon=True).start()
@@ -92,7 +92,7 @@ class ServerTest(unittest.TestCase):
         cases = {
             "../../etc/passwd": 403, "src/../../repo/src/app.py": 403, "%2e%2e/%2e%2e/etc/passwd": 403,
             "config/.env": 403, "deploy/env.storage.json": 403, ".git/config": 403,
-            "docs/onboarding/local/results/other.json": 403, "/etc/passwd": 403, "src/nope.py": 404,
+            "quizzler/local/results/other.json": 403, "/etc/passwd": 403, "src/nope.py": 404,
         }
         for path, expected in cases.items():
             # Pass the path pre-encoded so the server sees the raw form.
@@ -110,7 +110,7 @@ class ServerTest(unittest.TestCase):
     def test_outline_hides_refused_files(self):
         status, data = self.get_json("api/outline")
         self.assertIn("src/app.py", data["files"])
-        for bad in ("deploy/env.storage.json", "config/.env", "docs/onboarding/local/results/other.json"):
+        for bad in ("deploy/env.storage.json", "config/.env", "quizzler/local/results/other.json"):
             self.assertNotIn(bad, data["files"])
 
     def test_runs_only_registered_exercises(self):

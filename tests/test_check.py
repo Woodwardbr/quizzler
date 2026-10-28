@@ -24,7 +24,7 @@ class DriftGateTest(unittest.TestCase):
         self.assertEqual(report.errors, [])
 
     def test_detects_changed_expected_output(self):
-        self.fx.write("docs/onboarding/expected/hello.out", "hello 41\n")
+        self.fx.write("quizzler/expected/hello.out", "hello 41\n")
         errors = self.run_check().errors
         self.assertEqual(len(errors), 1)
         self.assertIn("output drifted", errors[0])
@@ -32,18 +32,18 @@ class DriftGateTest(unittest.TestCase):
         self.assertIn("+hello 42", errors[0])
 
     def test_detects_changed_exercise_behaviour(self):
-        self.fx.write("docs/onboarding/exercises/hello.py", '"""PREDICT: x"""\nprint("hello", 43)\n')
+        self.fx.write("quizzler/exercises/hello.py", '"""PREDICT: x"""\nprint("hello", 43)\n')
         self.assertIn("output drifted", self.run_check().errors[0])
 
     def test_update_expected_records_output(self):
-        self.fx.write("docs/onboarding/expected/hello.out", "stale\n")
+        self.fx.write("quizzler/expected/hello.out", "stale\n")
         report = check.Report()
         check.check_exercises(self.fx.onboard / "exercises", self.fx.onboard / "expected", report, update=True)
         self.assertEqual((self.fx.onboard / "expected/hello.out").read_text(), "hello 42\n")
         self.assertEqual(self.run_check().errors, [])
 
     def test_missing_expected_and_predict(self):
-        self.fx.write("docs/onboarding/exercises/bare.py", "print(1)\n")
+        self.fx.write("quizzler/exercises/bare.py", "print(1)\n")
         errors = "\n".join(self.run_check().errors)
         self.assertIn("PREDICT", errors)
         self.assertIn("no recorded output", errors)
@@ -84,7 +84,7 @@ class DriftGateTest(unittest.TestCase):
         path = self.fx.onboard / "examples/nested.html"
         path.write_text(path.read_text().replace("../app/guide.js", "app/guide.js"))
         errors = "\n".join(self.run_check("examples/nested.html").errors)
-        self.assertIn("does not point at docs/onboarding/app/", errors)
+        self.assertIn("does not point at quizzler/app/", errors)
 
     def test_listings_are_checked_against_source(self):
         body = """

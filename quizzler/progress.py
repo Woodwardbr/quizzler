@@ -9,7 +9,7 @@
 Answers are classified as misconception (wrong + sure), gap (wrong, not sure),
 fragile (right, not sure) or mastered (right + sure). Mastered questions are
 retired in later versions; the others tell the author what to re-explain.
-Records stay under docs/onboarding/local/ and never enter version control.
+Records stay under quizzler/local/ and never enter version control.
 """
 
 from __future__ import annotations

@@ -84,7 +84,7 @@ class RelayTest(unittest.TestCase):
     def test_server_picks_up_rewritten_guide(self):
         before = self.app.meta()["guide_mtime"]
         self.assertNotIn("extra", self.app.exercises)
-        self.fx.write("docs/onboarding/exercises/extra.py", '"""PREDICT: x"""\nprint(1)\n')
+        self.fx.write("quizzler/exercises/extra.py", '"""PREDICT: x"""\nprint(1)\n')
         time.sleep(0.01)
         guide = self.fx.onboard / "guide.html"
         head, tail = guide.read_text().rsplit("</section>", 1)

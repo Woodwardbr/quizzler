@@ -6,8 +6,8 @@
 
 - [ ] Every commit is signed off (`git commit -s`), per [CONTRIBUTING.md](../CONTRIBUTING.md)
 - [ ] `python -m unittest discover -s tests` passes
-- [ ] `python docs/onboarding/check.py` passes (guide anchors still match the source)
-- [ ] `python docs/onboarding/check_layout.py --require-browser` passes, or this change does not touch the UI
+- [ ] `python quizzler/check.py` passes (guide anchors still match the source)
+- [ ] `python quizzler/check_layout.py --require-browser` passes, or this change does not touch the UI
 - [ ] New source files start with `SPDX-License-Identifier: Apache-2.0`
 
 ## AI assistance

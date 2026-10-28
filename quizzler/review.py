@@ -10,7 +10,7 @@
     review.py list
     review.py cleanup 42 [--yes] [--keep-state]
 
-Review state lives in docs/onboarding/local/reviews/pr-<N>/ (ignored) and the
+Review state lives in quizzler/local/reviews/pr-<N>/ (ignored) and the
 code under review is checked out in .claude/worktrees/pr-<N>/ (ignored).
 Posting comments is deliberately not implemented: the agent shows the preview
 and only posts after a separate, explicit user instruction.
