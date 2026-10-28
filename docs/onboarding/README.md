@@ -93,7 +93,7 @@ A guide is an HTML file somewhere under `docs/onboarding/`. Its asset links are 
     </div>
 
     <div class="findings">   <!-- review mode; revealed after the module's questions are answered -->
-      <article class="finding" data-finding="persist-race" data-severity="major"
+      <article class="finding" data-finding="persist-race" data-severity="should-fix"
                data-src="src/db.py" data-lines="44-47">
         <h3>Short title</h3>
         <p><strong>Scenario:</strong> concrete inputs/state that lead to the failure.</p>
